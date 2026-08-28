@@ -1,6 +1,6 @@
 # Client Catalogue Request — build handoff
 
-Work order: `client-catalogue-request-build-1`
+Work orders: `client-catalogue-request-build-1`, `client-catalogue-request-repair-1`
 Build date: 2026-08-28
 Version: 1.0
 
@@ -51,6 +51,9 @@ Only `PORT` is required. The application defaults to port 8080, `data/`, and `di
 
 ## Known gaps and next steps
 
-- Docker is not installed in this worker, so the container command could not be executed locally. The two build stages were verified independently with `npm run build` and `cargo build --release`; the release binary was run against `dist/` as the container does.
+- Repair: reproduced ACR run `chgp` from the clean source tarball. It failed at `cargo build --release --locked` because `rustc 1.85.1` could not build `icu_* 2.3` (MSRV 1.88) or `idna_adapter 1.2.2` (MSRV 1.86). The server builder now uses `rust:1.88-bookworm`, matching the existing lockfile and documented local Rust requirement. The lockfile is intentionally unchanged: its pinned dependency graph is valid at this MSRV.
+- Added `tests/dockerfile.test.ts`, which requires a versioned Bookworm server builder at Rust 1.88 or later and keeps `cargo build --release --locked` in that stage. It passed as part of `npm test`.
+- Repair verification: `npm test` passed (5 Vitest, 6 Rust, 23 Chromium/mobile Playwright; 3 intentional mobile duplicates skipped); it covers end-to-end CSV import/request, demo isolation/reset, keyboard basket operation, mobile layout, axe accessibility, print, paid-license fallback, and same-origin privacy assertions. `npm run build`, `cargo build --release --locked`, and `git diff --check` also passed.
+- Exact clean ACR build: `az acr build --registry sociobotregistry --image sf-client-catalogue-request:repair-precommit --file Dockerfile --build-arg BUILD_SHA=repair-precommit --build-arg GIT_SHA=repair-precommit --build-arg SOURCE_COMMIT=repair-precommit .` completed as ACR run `chgq` on 2026-08-28. Its `rust:1.88-bookworm` stage completed `cargo build --release --locked` in 3m36s and pushed digest `sha256:4531eab832e56c9d689a604b776ca1f5af2e3f70728306304a7348ee970490b3`.
 - V1 deliberately does not send email, take payment, track inventory, calculate shipping, or accept orders. Sellers review the inbox and export requests. These are scope boundaries, not hidden stubs.
 - The factory still needs to register the billing product and set its production return URL. No product ID or payment-provider secret is embedded here.
