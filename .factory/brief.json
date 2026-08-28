@@ -1,0 +1,12 @@
+{
+  "slug": "client-catalogue-request",
+  "title": "Client Catalogue Request",
+  "territory": "utilities",
+  "user": "A tiny B2B seller that already maintains a product list and needs approved clients to request a quote or reorder without a full ecommerce store.",
+  "smallest_useful_product": "A shareable, passwordless client catalogue imported from CSV with request-for-quote basket, POA items, stock note, and CSV/PDF handoff to the seller.",
+  "success_measure": "A pilot seller receives 50% of repeat requests as structured baskets and reduces re-keyed line items by at least 75% in one month.",
+  "artifact_class": "web-with-backend",
+  "monetization": "subscription",
+  "constraints": "Avoid exposing stock counts or customer pricing by default; protect client links; make tax/pricing labels configurable; no payment-card handling in v1.",
+  "summary": "Turn repeat orders into structured quote requests"
+}
