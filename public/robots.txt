@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /c/
+Disallow: /manage
+Sitemap: https://client-catalogue-request.sociobot.in/sitemap.xml

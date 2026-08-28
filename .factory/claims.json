@@ -1,0 +1,44 @@
+[
+  {
+    "id": "demo-isolation",
+    "claim": "Demo — sample data, nothing is saved",
+    "where": "demo banner",
+    "test": "npm test -- --grep @claim:demo-isolation",
+    "sandbox": "fresh browser context; send a sample request; assert only the demo-prefixed storage key exists and no cross-origin request occurs"
+  },
+  {
+    "id": "poa-price",
+    "claim": "Prices can stay POA",
+    "where": "landing facts and sample catalogue",
+    "test": "npm test -- --grep @claim:poa-price",
+    "sandbox": "fresh browser context at /demo; inspect the blank-price sample item"
+  },
+  {
+    "id": "csv-export",
+    "claim": "Export each request as CSV",
+    "where": "how it works and seller request toolbar",
+    "test": "npm test -- --grep @claim:csv-export",
+    "sandbox": "fresh browser context at /demo/inbox; download CSV and assert one row for each sample request line"
+  },
+  {
+    "id": "structured-request",
+    "claim": "Each client request keeps SKUs, quantities, contact details, and notes",
+    "where": "landing preview and seller inbox",
+    "test": "npm test -- --grep @claim:structured-request",
+    "sandbox": "fresh browser context at /demo/inbox; assert SKU, quantity, and PO fields in the sample request"
+  },
+  {
+    "id": "no-card-data",
+    "claim": "No checkout or card data",
+    "where": "landing facts and request review",
+    "test": "npm test -- --grep @claim:no-card-data",
+    "sandbox": "fresh browser context at /demo; open request form and assert the no-payment notice and absence of card fields"
+  },
+  {
+    "id": "protected-links",
+    "claim": "Client links use random 28-character tokens",
+    "where": "README and server behavior",
+    "test": "cargo test generated_tokens_are_long_and_distinct",
+    "sandbox": "unit test generates two link tokens, checks length, and checks they differ"
+  }
+]

@@ -1,0 +1,22 @@
+{
+  "name": "client-catalogue-request",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run && cargo test && playwright test",
+    "test:e2e": "playwright test",
+    "start": "cargo run --release"
+  },
+  "devDependencies": {
+    "@fontsource/sora": "5.1.1",
+    "@types/node": "22.13.4",
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.58.2",
+    "typescript": "5.7.3",
+    "vite": "6.4.3",
+    "vitest": "3.2.7"
+  }
+}
