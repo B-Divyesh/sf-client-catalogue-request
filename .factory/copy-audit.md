@@ -29,15 +29,16 @@ Audited 2026-08-28. Button labels and index labels are included as fragments. Wo
 | A request desk, not a storefront | 6 | Pass |
 | It does not take payments, promise stock, calculate shipping, or manage fulfillment. | 12 | Pass |
 | You review every request before quoting. | 6 | Pass |
-| Keep the free desk, or remove limits | 8 | Pass |
+| Keep the free desk, or raise its limits | 8 | Pass |
 | The free workspace supports 12 catalogue rows and one client link. | 11 | Pass |
 | Request export stays free. | 4 | Pass |
 | ₹1,499 one-time | 2 | Pass |
-| Unlimited rows, client links, and request history. | 7 | Pass |
+| Use more than 12 catalogue rows and create more than one client link. | 12 | Pass |
 | Sociobot is the merchant of record. | 6 | Pass |
 | Refunds are handled there. | 4 | Pass |
-| Request Desk turns private product lists into clear quote requests. | 10 | Pass |
+| Client Catalogue Request turns private product lists into clear quote requests. | 11 | Pass |
 | Original generated artwork. | 3 | Pass |
+| Version 1.0 · Build dev | 4 | Pass |
 
 ## Terminology table
 

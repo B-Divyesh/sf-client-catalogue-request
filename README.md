@@ -8,7 +8,7 @@ Live product: <https://client-catalogue-request.sociobot.in>
 
 ## Try the sandbox
 
-Open `/demo` or <https://client-catalogue-request.sociobot.in/demo>. It includes six realistic products, POA pricing, stock caveats, a request basket, and a sample seller inbox. Demo changes use only the `demo:client-catalogue-request:requests` browser key. Use **Reset demo** to clear it.
+Open `/demo` or <https://client-catalogue-request.sociobot.in/demo>. It includes six realistic products, POA pricing, stock caveats, a request basket, and a sample seller inbox. The browser stores only a random demo workspace ID. The server keeps demo requests in isolated memory for up to 24 hours. Use **Reset demo** to delete that workspace.
 
 ## Seller workflow
 
@@ -17,7 +17,7 @@ Open `/demo` or <https://client-catalogue-request.sociobot.in/demo>. It includes
 3. Create a named client link and share it with that client.
 4. Review incoming requests in the workspace. Export all lines to CSV or print a request to PDF.
 
-The free workspace supports 12 catalogue rows and one client link. Request export stays free. The ₹1,499 one-time full-workspace license removes row and link limits. Checkout and license checks use Sociobot; no payment provider runs in this app.
+The free workspace supports 12 catalogue rows and one client link. Request export stays free. The ₹1,499 one-time license supports more rows and links, with up to 5,000 rows per import. Checkout and license checks use Sociobot; no payment provider runs in this app.
 
 ## Run locally
 

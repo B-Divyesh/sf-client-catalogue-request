@@ -4,7 +4,7 @@
     "claim": "Demo — sample data, nothing is saved",
     "where": "demo banner",
     "test": "npm test -- --grep @claim:demo-isolation",
-    "sandbox": "fresh browser context; send a sample request; assert only the demo-prefixed storage key exists and no cross-origin request occurs"
+    "sandbox": "fresh browser context; send a sample request to an ephemeral demo workspace; assert only the demo-prefixed ID key exists and no cross-origin request occurs"
   },
   {
     "id": "poa-price",
@@ -40,5 +40,40 @@
     "where": "README and server behavior",
     "test": "cargo test generated_tokens_are_long_and_distinct",
     "sandbox": "unit test generates two link tokens, checks length, and checks they differ"
+  },
+  {
+    "id": "csv-import",
+    "claim": "Imports a product CSV with SKU, name, price, category, and stock note fields",
+    "where": "landing workflow and seller workspace",
+    "test": "npm test -- --grep @claim:csv-import",
+    "sandbox": "fresh seller workspace; import a one-row CSV and open that product through its client link"
+  },
+  {
+    "id": "print-request",
+    "claim": "Prints a clean request sheet for PDF saving",
+    "where": "landing workflow and request toolbar",
+    "test": "npm test -- --grep @claim:print-request",
+    "sandbox": "fresh demo workspace; invoke Print request and assert only the chosen request is marked for print"
+  },
+  {
+    "id": "paid-license",
+    "claim": "The ₹1,499 one-time license raises the 12-row and one-link free limits",
+    "where": "landing paid tier and README",
+    "test": "npm test -- --grep @claim:paid-license",
+    "sandbox": "fresh browser context; mock a valid Sociobot verification response, consume the return token, and inspect the checkout link"
+  },
+  {
+    "id": "stock-privacy",
+    "claim": "The client catalogue does not expose stock counts",
+    "where": "landing workflow and README",
+    "test": "cargo test stock_counts_are_not_exposed",
+    "sandbox": "serialize a product returned by the catalogue API and assert there is no stock-count field"
+  },
+  {
+    "id": "privacy-runtime",
+    "claim": "There are no analytics, advertising scripts, remote fonts, or runtime CDNs",
+    "where": "privacy page and README",
+    "test": "npm test -- --grep @claim:privacy-runtime",
+    "sandbox": "fresh browser context; load the landing page and demo while recording every request origin"
   }
 ]

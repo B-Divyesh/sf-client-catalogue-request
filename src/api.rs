@@ -3,7 +3,7 @@ use argon2::{
     Argon2,
 };
 use axum::{
-    extract::{ConnectInfo, Path, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Path, State},
     http::{header, HeaderMap, HeaderValue, Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{Row, SqlitePool};
 use std::{
+    collections::HashSet,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
@@ -25,12 +26,19 @@ use std::{
 pub struct AppState {
     pub pool: SqlitePool,
     rates: Arc<DashMap<String, (Instant, u32)>>,
+    demos: Arc<DashMap<String, DemoWorkspace>>,
+}
+#[derive(Clone)]
+struct DemoWorkspace {
+    created_at: Instant,
+    requests: Vec<Value>,
 }
 impl AppState {
     pub fn new(pool: SqlitePool) -> Self {
         Self {
             pool,
             rates: Arc::new(DashMap::new()),
+            demos: Arc::new(DashMap::new()),
         }
     }
 }
@@ -56,8 +64,73 @@ pub fn api_router(state: AppState) -> Router {
         .route("/admin/requests", get(list_requests))
         .route("/catalogue/{token}", get(client_catalogue))
         .route("/requests/{token}", post(create_request))
+        .route("/demo", post(create_demo))
+        .route(
+            "/demo/{id}/requests",
+            get(demo_requests)
+                .post(create_demo_request)
+                .delete(delete_demo),
+        )
+        .layer(DefaultBodyLimit::max(5 * 1024 * 1024))
         .layer(middleware::from_fn_with_state(state.clone(), rate_limit))
         .with_state(state)
+}
+
+const DEMO_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+
+fn sample_demo_request() -> Value {
+    json!({
+        "id":"RQ-6C24A19E", "client_name":"Maya Patel", "company":"Juniper Corner",
+        "email":"maya@example.test", "po_number":"PO-1842",
+        "note":"Please quote delivery to Bristol.", "status":"New", "created_at":"2026-08-28 09:14",
+        "lines":[
+            {"product_id":"p1", "sku":"NW-101", "name":"Recycled counter notebook", "quantity":24, "price_cents":850},
+            {"product_id":"p4", "sku":"PK-228", "name":"Custom paper tape", "quantity":12, "price_cents":null}
+        ]
+    })
+}
+
+async fn create_demo(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
+    state
+        .demos
+        .retain(|_, demo| demo.created_at.elapsed() < DEMO_TTL);
+    let id = token(32);
+    state.demos.insert(
+        id.clone(),
+        DemoWorkspace {
+            created_at: Instant::now(),
+            requests: vec![sample_demo_request()],
+        },
+    );
+    (
+        StatusCode::CREATED,
+        Json(json!({"id":id, "expires_in_seconds":DEMO_TTL.as_secs()})),
+    )
+}
+
+fn demo_not_found() -> (StatusCode, Json<Value>) {
+    err(
+        StatusCode::NOT_FOUND,
+        "This sample workspace expired. Reset the demo to start again.",
+    )
+}
+
+async fn demo_requests(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let demo = state.demos.get(&id).ok_or_else(demo_not_found)?;
+    if demo.created_at.elapsed() >= DEMO_TTL {
+        drop(demo);
+        state.demos.remove(&id);
+        return Err(demo_not_found());
+    }
+    Ok(Json(json!({"requests":demo.requests.clone()})))
+}
+
+async fn delete_demo(State(state): State<AppState>, Path(id): Path<String>) -> StatusCode {
+    state.demos.remove(&id);
+    StatusCode::NO_CONTENT
 }
 
 async fn rate_limit(
@@ -73,7 +146,7 @@ async fn rate_limit(
         .and_then(|v| v.split(',').next())
         .map(|v| v.trim().to_owned())
         .unwrap_or_else(|| peer.ip().to_string());
-    let key = format!("{}:{}", ip, req.uri().path());
+    let key = ip;
     let now = Instant::now();
     let mut entry = state.rates.entry(key).or_insert((now, 0));
     if now.duration_since(entry.0) >= Duration::from_secs(1) {
@@ -120,10 +193,10 @@ async fn setup(
             "Enter a business name between 2 and 80 characters.",
         ));
     }
-    if input.password.len() < 10 {
+    if input.password.len() < 10 || input.password.len() > 200 {
         return Err(err(
             StatusCode::BAD_REQUEST,
-            "Use at least 10 characters for the password.",
+            "Use a password from 10 to 200 characters.",
         ));
     }
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM owner")
@@ -168,6 +241,12 @@ async fn login(
     State(state): State<AppState>,
     Json(input): Json<LoginInput>,
 ) -> ApiResult<Json<Value>> {
+    if input.password.len() > 200 {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "The password is too long. Use no more than 200 characters.",
+        ));
+    }
     let row = sqlx::query("SELECT password_hash FROM owner WHERE id=1")
         .fetch_optional(&state.pool)
         .await
@@ -309,7 +388,11 @@ async fn save_catalogue(
     for (index, p) in payload.products.iter().enumerate() {
         if p.sku.trim().is_empty()
             || p.name.trim().is_empty()
+            || p.sku.len() > 80
             || p.name.len() > 120
+            || p.description.len() > 1000
+            || p.category.len() > 80
+            || p.stock_note.len() > 200
             || p.price_cents.is_some_and(|v| v < 0)
         {
             return Err(err(
@@ -331,7 +414,10 @@ async fn save_catalogue(
 }
 fn validate_settings(s: &Settings) -> ApiResult<()> {
     if s.business_name.trim().is_empty()
+        || s.business_name.len() > 80
         || s.price_label.trim().is_empty()
+        || s.price_label.len() > 40
+        || s.tax_note.len() > 160
         || s.currency.trim().len() != 3
     {
         return Err(err(
@@ -351,7 +437,7 @@ async fn create_link(
     Json(input): Json<LinkInput>,
 ) -> ApiResult<Json<ClientLink>> {
     require_admin(&headers, &state.pool).await?;
-    if input.label.trim().len() < 2 {
+    if input.label.trim().len() < 2 || input.label.len() > 120 {
         return Err(err(
             StatusCode::BAD_REQUEST,
             "Name the client or client group for this link.",
@@ -458,6 +544,96 @@ struct RequestLineInput {
     product_id: String,
     quantity: i64,
 }
+fn validate_request(input: &RequestInput) -> ApiResult<()> {
+    if input.client_name.trim().len() < 2
+        || input.client_name.len() > 120
+        || input.company.trim().len() < 2
+        || input.company.len() > 120
+        || !input.email.contains('@')
+        || input.email.len() > 254
+        || input.po_number.len() > 80
+        || input.note.len() > 2000
+    {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Add your name, company, and a valid email address.",
+        ));
+    }
+    if input.lines.is_empty()
+        || input.lines.len() > 100
+        || input
+            .lines
+            .iter()
+            .any(|line| line.quantity < 1 || line.quantity > 9999)
+    {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Add at least one product. Each quantity must be from 1 to 9,999.",
+        ));
+    }
+    let mut product_ids = HashSet::new();
+    if input
+        .lines
+        .iter()
+        .any(|line| !product_ids.insert(&line.product_id))
+    {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "Each product can appear only once. Change its quantity instead.",
+        ));
+    }
+    Ok(())
+}
+
+async fn create_demo_request(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(input): Json<RequestInput>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    validate_request(&input)?;
+    let products = [
+        ("p1", "NW-101", "Recycled counter notebook", Some(850)),
+        ("p2", "NW-114", "Brass desk ruler", Some(1250)),
+        ("p3", "PK-220", "Kraft dispatch box", Some(1890)),
+        ("p4", "PK-228", "Custom paper tape", None),
+        ("p5", "SV-410", "Shelf label set", Some(2400)),
+        ("p6", "SV-421", "Oak display riser", None),
+    ];
+    let mut lines = Vec::new();
+    for line in &input.lines {
+        let product = products
+            .iter()
+            .find(|product| product.0 == line.product_id)
+            .ok_or_else(|| {
+                err(
+                    StatusCode::BAD_REQUEST,
+                    "A selected sample product is not available. Reset the demo.",
+                )
+            })?;
+        lines.push(json!({
+            "product_id":product.0, "sku":product.1, "name":product.2,
+            "quantity":line.quantity, "price_cents":product.3
+        }));
+    }
+    let request_id = format!(
+        "RQ-DEMO-{}",
+        &uuid::Uuid::new_v4().simple().to_string()[..4].to_uppercase()
+    );
+    let request = json!({
+        "id":request_id, "client_name":input.client_name.trim(), "company":input.company.trim(),
+        "email":input.email.trim(), "po_number":input.po_number.trim(), "note":input.note.trim(),
+        "status":"New", "created_at":chrono::Utc::now().to_rfc3339(), "lines":lines
+    });
+    let mut demo = state.demos.get_mut(&id).ok_or_else(demo_not_found)?;
+    if demo.created_at.elapsed() >= DEMO_TTL {
+        drop(demo);
+        state.demos.remove(&id);
+        return Err(demo_not_found());
+    }
+    demo.requests.insert(0, request);
+    Ok((StatusCode::CREATED, Json(json!({"id":request_id}))))
+}
+
 async fn create_request(
     State(state): State<AppState>,
     Path(link_token): Path<String>,
@@ -475,27 +651,7 @@ async fn create_request(
             "This client link is not active. Ask the seller for a new link.",
         ));
     }
-    if input.client_name.trim().len() < 2
-        || input.company.trim().len() < 2
-        || !input.email.contains('@')
-    {
-        return Err(err(
-            StatusCode::BAD_REQUEST,
-            "Add your name, company, and a valid email address.",
-        ));
-    }
-    if input.lines.is_empty()
-        || input.lines.len() > 100
-        || input
-            .lines
-            .iter()
-            .any(|l| l.quantity < 1 || l.quantity > 9999)
-    {
-        return Err(err(
-            StatusCode::BAD_REQUEST,
-            "Add at least one product. Each quantity must be from 1 to 9,999.",
-        ));
-    }
+    validate_request(&input)?;
     let id = format!(
         "RQ-{}",
         uuid::Uuid::new_v4().simple().to_string()[..8].to_uppercase()
@@ -571,6 +727,23 @@ mod tests {
         assert!(validate_settings(&s).is_err());
     }
 
+    #[test]
+    fn stock_counts_are_not_exposed() {
+        let product = Product {
+            id: "p1".into(),
+            sku: "NW-101".into(),
+            name: "Notebook".into(),
+            description: "Recycled paper".into(),
+            category: "Desk".into(),
+            price_cents: Some(850),
+            stock_note: "Ask about availability".into(),
+        };
+        let value = serde_json::to_value(product).unwrap();
+        assert!(value.get("stock_note").is_some());
+        assert!(value.get("stock_count").is_none());
+        assert!(value.get("quantity_available").is_none());
+    }
+
     async fn call(
         app: &Router,
         method: &str,
@@ -591,7 +764,12 @@ mod tests {
         let response = app.clone().oneshot(req).await.unwrap();
         let status = response.status();
         let bytes = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-        (status, serde_json::from_slice(&bytes).unwrap())
+        let body = if bytes.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes).unwrap()
+        };
+        (status, body)
     }
 
     #[tokio::test]
@@ -668,5 +846,57 @@ mod tests {
         let response = last.unwrap();
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "1");
+    }
+
+    #[tokio::test]
+    async fn demo_workspaces_are_ephemeral_and_isolated() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::migrate!().run(&pool).await.unwrap();
+        let app = api_router(AppState::new(pool));
+        let (_, first) = call(&app, "POST", "/demo", json!(null), None).await;
+        let (_, second) = call(&app, "POST", "/demo", json!(null), None).await;
+        let first_id = first["id"].as_str().unwrap();
+        let second_id = second["id"].as_str().unwrap();
+        assert_ne!(first_id, second_id);
+        let (status, _) = call(
+            &app,
+            "POST",
+            &format!("/demo/{first_id}/requests"),
+            json!({"client_name":"Alex Buyer","company":"Test Client","email":"alex@example.test","po_number":"","note":"","lines":[{"product_id":"p1","quantity":2}]}),
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        let (_, first_requests) = call(
+            &app,
+            "GET",
+            &format!("/demo/{first_id}/requests"),
+            json!(null),
+            None,
+        )
+        .await;
+        let (_, second_requests) = call(
+            &app,
+            "GET",
+            &format!("/demo/{second_id}/requests"),
+            json!(null),
+            None,
+        )
+        .await;
+        assert_eq!(first_requests["requests"].as_array().unwrap().len(), 2);
+        assert_eq!(second_requests["requests"].as_array().unwrap().len(), 1);
+        let (status, _) = call(
+            &app,
+            "DELETE",
+            &format!("/demo/{first_id}/requests"),
+            json!(null),
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
     }
 }
