@@ -9,7 +9,7 @@ use axum::{
     Json, Router,
 };
 use serde_json::json;
-use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use std::{env, net::SocketAddr, path::Path};
 use tower_http::{
     compression::CompressionLayer, services::ServeDir, set_header::SetResponseHeaderLayer,
@@ -50,16 +50,7 @@ async fn main() -> anyhow::Result<()> {
     );
     let port = config.port;
     let data_dir = config.data_dir;
-    tokio::fs::create_dir_all(&data_dir).await?;
-    let db_path = format!("{data_dir}/catalogue.db");
-    if !Path::new(&db_path).exists() {
-        tokio::fs::File::create(&db_path).await?;
-    }
-    let pool = SqlitePoolOptions::new()
-        .max_connections(8)
-        .connect(&format!("sqlite://{db_path}"))
-        .await?;
-    sqlx::migrate!().run(&pool).await?;
+    let (pool, db_path) = open_database(&data_dir).await?;
     let state = AppState::new(pool);
     let build_sha = option_env!("BUILD_SHA").unwrap_or("dev").to_string();
     let web_dist = config.web_dist;
@@ -71,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
             "/health",
             get({
                 let sha = build_sha.clone();
-                move || async move { Json(json!({"ok": true, "build_sha": sha})) }
+                move || async move { health_payload(&sha) }
             }),
         )
         .nest("/api", api_router(state))
@@ -165,6 +156,24 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn health_payload(build_sha: &str) -> Json<serde_json::Value> {
+    Json(json!({"ok": true, "build_sha": build_sha}))
+}
+
+async fn open_database(data_dir: &str) -> anyhow::Result<(SqlitePool, String)> {
+    tokio::fs::create_dir_all(data_dir).await?;
+    let db_path = format!("{data_dir}/catalogue.db");
+    if !Path::new(&db_path).exists() {
+        tokio::fs::File::create(&db_path).await?;
+    }
+    let pool = SqlitePoolOptions::new()
+        .max_connections(8)
+        .connect(&format!("sqlite://{db_path}"))
+        .await?;
+    sqlx::migrate!().run(&pool).await?;
+    Ok((pool, db_path))
+}
+
 async fn serve_index(index: String) -> Response {
     match tokio::fs::read(index).await {
         Ok(bytes) => (
@@ -227,5 +236,71 @@ mod tests {
             .split(';')
             .any(|directive| directive.trim()
                 == "frame-src 'self' https://sociobotcustomers.ciamlogin.com"));
+    }
+
+    #[test]
+    fn health_returns_supplied_build_sha() {
+        let body = health_payload("claim-build-123");
+        assert_eq!(body["ok"], true);
+        assert_eq!(body["build_sha"], "claim-build-123");
+    }
+
+    #[tokio::test]
+    async fn runtime_creates_and_reopens_sqlite_storage() {
+        let temp = tempfile::tempdir().unwrap();
+        let data_dir = temp.path().join("new-data");
+        assert!(!data_dir.exists());
+
+        let (pool, db_path) = open_database(data_dir.to_str().unwrap()).await.unwrap();
+        assert!(Path::new(&db_path).is_file());
+        for table in [
+            "tenant_settings",
+            "tenant_products",
+            "tenant_links",
+            "tenant_requests",
+            "tenant_request_lines",
+        ] {
+            let exists: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
+            )
+            .bind(table)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(exists, 1, "missing SQLite table {table}");
+        }
+        for statement in [
+            "INSERT INTO sellers(subject) VALUES('claim-seller')",
+            "INSERT INTO tenant_settings(seller_subject,business_name,price_label,tax_note,currency) VALUES('claim-seller','Claim seller','Price','','GBP')",
+            "INSERT INTO tenant_products(seller_subject,id,sku,name) VALUES('claim-seller','p1','SKU-1','Claim product')",
+            "INSERT INTO tenant_links(token,seller_subject,label) VALUES('claim-link','claim-seller','Claim client')",
+            "INSERT INTO tenant_requests(id,seller_subject,link_token,client_name,company,email) VALUES('RQ-CLAIM','claim-seller','claim-link','Claim buyer','Claim client','buyer@example.test')",
+            "INSERT INTO tenant_request_lines(request_id,product_id,sku,name,quantity) VALUES('RQ-CLAIM','p1','SKU-1','Claim product',2)",
+        ] {
+            sqlx::query(statement).execute(&pool).await.unwrap();
+        }
+        pool.close().await;
+
+        let (reopened, reopened_path) = open_database(data_dir.to_str().unwrap()).await.unwrap();
+        assert_eq!(reopened_path, db_path);
+        let seller: String = sqlx::query_scalar(
+            "SELECT business_name FROM tenant_settings WHERE seller_subject='claim-seller'",
+        )
+        .fetch_one(&reopened)
+        .await
+        .unwrap();
+        assert_eq!(seller, "Claim seller");
+        for table in [
+            "tenant_products",
+            "tenant_links",
+            "tenant_requests",
+            "tenant_request_lines",
+        ] {
+            let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
+                .fetch_one(&reopened)
+                .await
+                .unwrap();
+            assert_eq!(count, 1, "missing persisted row in {table}");
+        }
     }
 }

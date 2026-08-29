@@ -30,6 +30,32 @@ test('@claim:demo-reset resetting the demo removes browser sample requests',asyn
   await expect(page.getByText('1 sample request')).toBeVisible();
 });
 
+test('@claim:demo-entry opens an isolated sample in one click and by query URL',async({page})=>{
+  await page.goto('/');
+  await page.getByRole('link',{name:'Try it with sample data'}).click();
+  await expect(page).toHaveURL(/\/?\?demo=1$/);
+  await expect(page.getByText('Demo — sample data, nothing is saved')).toBeVisible();
+  await expect(page.getByRole('heading',{level:1,name:'Northline Supply Co.'})).toBeVisible();
+  expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual(['demo:client-catalogue-request:requests']);
+
+  await page.evaluate(()=>localStorage.clear());
+  await page.goto('/?demo=1');
+  await expect(page.getByRole('heading',{level:1,name:'Northline Supply Co.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Reset demo'})).toBeVisible();
+});
+
+test('@claim:demo-sample-content provides six useful products and a seeded seller inbox',async({page})=>{
+  await page.goto('/?demo=1');
+  await expect(page.locator('.product-card')).toHaveCount(6);
+  await expect(page.locator('.product-card').getByText('POA',{exact:true})).toHaveCount(2);
+  await expect(page.getByText('Low stock — ask for lead time')).toBeVisible();
+  await expect(page.getByText('Made to order — allow 3 weeks')).toBeVisible();
+  await expect(page.getByRole('button',{name:/Review request/})).toBeVisible();
+  await page.getByRole('link',{name:'Seller sample'}).click();
+  await expect(page.getByText('1 sample request')).toBeVisible();
+  await expect(page.getByText('Juniper Corner')).toBeVisible();
+});
+
 test('@claim:poa-price blank prices are shown as POA',async({page})=>{
   await page.goto('/demo');
   await expect(page.getByRole('article').filter({hasText:'Custom paper tape'}).getByText('POA')).toBeVisible();
@@ -48,6 +74,18 @@ test('@claim:csv-export exports one row for every sample request line',async({pa
   expect(csv).toContain('PK-228');
 });
 
+test('@claim:free-export exports requests without a license',async({page})=>{
+  await page.goto('/demo/inbox?demo=1');
+  expect(await page.evaluate(()=>localStorage.getItem('sb_license:client-catalogue-request'))).toBeNull();
+  const downloadPromise=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Export CSV'}).click();
+  const download=await downloadPromise;
+  expect(download.suggestedFilename()).toBe('sample-quote-requests.csv');
+  const stream=await download.createReadStream();
+  const chunks:Buffer[]=[];for await(const chunk of stream)chunks.push(chunk);
+  expect(Buffer.concat(chunks).toString('utf8')).toContain('RQ-6C24A19E');
+});
+
 test('@claim:structured-request keeps SKUs and quantities',async({page})=>{
   await page.goto('/demo/inbox');
   const request=page.getByRole('article').filter({hasText:'RQ-6C24A19E'});
@@ -64,6 +102,39 @@ test('@claim:no-card-data has no card fields or checkout in request form',async(
   await page.getByRole('button',{name:/Review request/}).click();
   await expect(page.getByText('It does not place or pay for an order.')).toBeVisible();
   await expect(page.locator('input[autocomplete="cc-number"]')).toHaveCount(0);
+});
+
+test('@claim:service-boundaries labels requests as unconfirmed and keeps fulfilment outside the service',async({page})=>{
+  await page.goto('/?demo=1');
+  await page.getByRole('button',{name:'Add to request'}).first().click();
+  await page.getByRole('button',{name:/Review request/}).click();
+  await expect(page.getByText('This sends a quote request. It does not place or pay for an order.')).toBeVisible();
+  await page.goto('/terms');
+  await expect(page.getByText('A request is not an accepted order, stock promise, shipping quote, or tax invoice.')).toBeVisible();
+});
+
+test('@claim:billing-handoff uses Sociobot for checkout and locks a refunded license',async({page})=>{
+  await page.goto('/');
+  await expect(page.getByRole('link',{name:'Buy the full workspace'})).toHaveAttribute('href','https://api.sociobot.in/api/v1/products/client-catalogue-request/checkout');
+  await page.goto('/terms');
+  await expect(page.getByText(/Sociobot, the merchant of record/)).toBeVisible();
+  await expect(page.getByText(/A refund revokes the related license/)).toBeVisible();
+  await page.route('https://api.sociobot.in/api/v1/products/client-catalogue-request/verify?license=refunded-license',route=>route.fulfill({json:{valid:false,reason:'revoked',expires_at:null}}));
+  await page.goto('/?license=refunded-license');
+  await expect(page.getByRole('status')).toContainText('License no longer active');
+});
+
+test('@claim:browser-storage keeps sign-in, license, and demo data in their documented namespaces',async({page})=>{
+  await page.addInitScript(()=>sessionStorage.setItem('ccr:session','test-seller:storage-claim'));
+  await page.route('https://api.sociobot.in/api/v1/products/client-catalogue-request/verify?license=storage-license',route=>route.fulfill({json:{valid:true,reason:'ok',expires_at:null}}));
+  await page.goto('/?license=storage-license');
+  await expect(page).toHaveURL('/');
+  expect(await page.evaluate(()=>Object.keys(sessionStorage))).toEqual(['ccr:session']);
+  await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).sort())).toEqual(['sb_license:client-catalogue-request','sb_license_cache:client-catalogue-request']);
+  await page.goto('/?demo=1');
+  await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('demo:')))).toEqual(['demo:client-catalogue-request:requests']);
+  await page.getByRole('link',{name:'Start for real'}).click();
+  await expect.poll(()=>page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('demo:')))).toEqual([]);
 });
 
 test('landing and demo have no serious accessibility findings',async({page},testInfo)=>{
@@ -118,6 +189,8 @@ test('client-side navigation moves focus to the new page heading',async({page})=
   await page.goto('/');
   await page.locator('.site-header nav').getByRole('link',{name:'Demo'}).click();
   await expect(page.getByRole('heading',{level:1,name:'Northline Supply Co.'})).toBeFocused();
+  await page.goBack();
+  await expect(page.getByRole('heading',{level:1,name:'Turn repeat orders into clear requests'})).toBeFocused();
 });
 
 test('production policy allows Entra discovery and requests the seller API scope',async({page},testInfo)=>{
@@ -146,12 +219,18 @@ test('mobile controls meet touch and text-reflow boundaries',async({page},testIn
     for(const box of boxes.filter(box=>box.width>0&&box.height>0)){expect(box.width,selector).toBeGreaterThanOrEqual(44);expect(box.height,selector).toBeGreaterThanOrEqual(44);}
   }
   await page.goto('/');
+  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect(page.getByRole('link',{name:'Try it with sample data'})).toBeInViewport();
   const privacyLink=await page.getByRole('link',{name:'Read how request data is handled'}).boundingBox();
   expect(privacyLink?.height).toBeGreaterThanOrEqual(44);
   await page.goto('/demo/inbox');
   const emailLink=await page.getByRole('link',{name:'maya@example.test'}).boundingBox();
   expect(emailLink?.height).toBeGreaterThanOrEqual(44);
   await page.goto('/demo');
+  for(const selector of ['.demo-banner button','.demo-banner a']){
+    const boxes=await page.locator(selector).evaluateAll(nodes=>nodes.map(node=>{const box=(node as HTMLElement).getBoundingClientRect();return {width:box.width,height:box.height};}));
+    for(const box of boxes){expect(box.width,selector).toBeGreaterThanOrEqual(44);expect(box.height,selector).toBeGreaterThanOrEqual(44);}
+  }
   await page.setViewportSize({width:320,height:844});
   await page.evaluate(()=>document.documentElement.style.fontSize='200%');
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
@@ -160,16 +239,38 @@ test('mobile controls meet touch and text-reflow boundaries',async({page},testIn
 test('public routes keep the document skeleton and load without console errors',async({page})=>{
   const errors:string[]=[];
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
-  for(const path of ['/','/demo','/demo/inbox','/privacy','/terms','/manage','/missing-page']){
+  const routes=[
+    {path:'/',title:'Client Catalogue Request — collect quote requests',canonical:'/'},
+    {path:'/?demo=1',title:'Demo — Client Catalogue Request',canonical:'/demo'},
+    {path:'/demo',title:'Demo — Client Catalogue Request',canonical:'/demo'},
+    {path:'/demo/inbox',title:'Demo seller inbox — Client Catalogue Request',canonical:'/demo/inbox'},
+    {path:'/privacy',title:'Privacy — Client Catalogue Request',canonical:'/privacy'},
+    {path:'/terms',title:'Terms — Client Catalogue Request',canonical:'/terms'},
+    {path:'/manage',title:'Seller workspace — Client Catalogue Request',canonical:'/manage'},
+    {path:'/missing-page',title:'Page not found — Client Catalogue Request',canonical:'/missing-page'},
+  ];
+  for(const route of routes){
+    const path=route.path;
     await page.goto(path);
     await expect(page.locator('main')).toHaveCount(1);
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page).toHaveTitle(/Client Catalogue Request/);
+    await expect(page).toHaveTitle(route.title);
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute('content',/.{20,155}/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href',`https://client-catalogue-request.sociobot.in${route.canonical}`);
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content',route.title);
+    await expect(page.locator('meta[name="twitter:title"]')).toHaveAttribute('content',route.title);
     expect(await page.locator('html').getAttribute('lang')).toBe('en');
     expect(await page.locator('img:not([alt])').count()).toBe(0);
+    await expect(page.locator('footer').getByRole('link',{name:'Privacy'})).toBeVisible();
+    await expect(page.locator('footer').getByRole('link',{name:'Terms'})).toBeVisible();
     const results=await new AxeBuilder({page:page as never}).withTags(['wcag2a','wcag2aa']).analyze();
     expect(results.violations.filter(v=>['serious','critical'].includes(v.impact||'')),path).toEqual([]);
   }
+  const missingUrl=process.env.PLAYWRIGHT_BASE_URL?'/missing-page':'http://127.0.0.1:8080/missing-page';
+  expect((await page.request.get(missingUrl)).status()).toBe(404);
+  await page.goto('/missing-page');
+  await page.getByRole('link',{name:'Return to the start'}).click();
+  await expect(page.getByRole('heading',{name:'Turn repeat orders into clear requests'})).toBeFocused();
   expect(errors.filter(error=>!/^Failed to load resource: the server responded with a status of 404/.test(error))).toEqual([]);
 });
 

@@ -17,4 +17,12 @@ describe('container build contract', () => {
   it('compresses production responses', () => {
     expect(server).toContain('.layer(CompressionLayer::new())');
   });
+
+  it('@claim:container-runtime builds both tiers and runs non-root with persistent data defaults', () => {
+    expect(dockerfile).toMatch(/^FROM node:22-bookworm-slim AS web$/m);
+    expect(dockerfile).toMatch(/^FROM rust:1-bookworm AS server$/m);
+    expect(dockerfile).toMatch(/^USER app$/m);
+    expect(dockerfile).toMatch(/^ENV PORT=8080 DATA_DIR=\/app\/data WEB_DIST=\/app\/dist$/m);
+    expect(dockerfile).toMatch(/^VOLUME \["\/app\/data"\]$/m);
+  });
 });

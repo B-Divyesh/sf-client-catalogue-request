@@ -7,6 +7,20 @@
     "sandbox": "fresh browser context; send a sample request to an ephemeral demo workspace; assert only the demo-prefixed ID key exists and no cross-origin request occurs"
   },
   {
+    "id": "demo-entry",
+    "claim": "Try it with sample data opens an isolated demo in one click; /?demo=1 opens the same demo directly",
+    "where": "landing primary action, README",
+    "test": "npm test -- --grep @claim:demo-entry",
+    "sandbox": "fresh browser context and empty storage; click the first-screen action, then open /?demo=1 directly; assert the banner, sample catalogue, and demo-only key"
+  },
+  {
+    "id": "demo-sample-content",
+    "claim": "The demo includes six realistic products, two POA prices, stock notes, a request basket, and a seeded seller inbox",
+    "where": "README and demo",
+    "test": "npm test -- --grep @claim:demo-sample-content",
+    "sandbox": "fresh browser context at /?demo=1; count products and POA prices, inspect stock notes and basket, then open the seeded seller inbox"
+  },
+  {
     "id": "poa-price",
     "claim": "Prices can stay POA",
     "where": "landing facts and sample catalogue",
@@ -19,6 +33,13 @@
     "where": "how it works and seller request toolbar",
     "test": "npm test -- --grep @claim:csv-export",
     "sandbox": "fresh browser context at /demo/inbox; download CSV and assert one row for each sample request line"
+  },
+  {
+    "id": "free-export",
+    "claim": "Request export stays free",
+    "where": "landing paid tier, seller workspace, terms, README",
+    "test": "npm test -- --grep @claim:free-export",
+    "sandbox": "fresh unlicensed browser context at /demo/inbox; export the seeded request and assert the downloaded CSV contains it"
   },
   {
     "id": "structured-request",
@@ -35,6 +56,13 @@
     "sandbox": "fresh browser context at /demo; open request form and assert the no-payment notice and absence of card fields"
   },
   {
+    "id": "service-boundaries",
+    "claim": "The service collects quote requests; it does not confirm an order, stock, shipping, or tax",
+    "where": "landing boundaries, request form, terms",
+    "test": "npm test -- --grep @claim:service-boundaries",
+    "sandbox": "fresh browser context at /?demo=1; inspect the request form and terms for the explicit unconfirmed-request boundary"
+  },
+  {
     "id": "protected-links",
     "claim": "Client links use random 28-character tokens",
     "where": "README and server behavior",
@@ -49,6 +77,13 @@
     "sandbox": "fresh seller workspace; import a one-row CSV and open that product through its client link"
   },
   {
+    "id": "csv-header-normalization",
+    "claim": "CSV header names are case-insensitive",
+    "where": "README CSV format",
+    "test": "npx vitest run --testNamePattern @claim:csv-header-normalization",
+    "sandbox": "parse a fixture whose six supported headings use mixed case and a space; assert every field and price is imported"
+  },
+  {
     "id": "print-request",
     "claim": "Prints a clean request sheet for PDF saving",
     "where": "landing workflow and request toolbar",
@@ -61,6 +96,13 @@
     "where": "landing paid tier and README",
     "test": "npm test -- --grep '@claim:paid-license(?!-invalid)'",
     "sandbox": "fresh seller tenant and recorded valid Sociobot response; consume the return token, save 13 rows, and create two active client links through the real backend"
+  },
+  {
+    "id": "billing-handoff",
+    "claim": "Checkout uses Sociobot as merchant of record, and a refunded license loses paid access",
+    "where": "landing checkout, terms, README",
+    "test": "npm test -- --grep @claim:billing-handoff",
+    "sandbox": "fresh browser context; assert the checkout target and legal disclosure, then use a recorded revoked-license response and assert paid access stays locked"
   },
   {
     "id": "stock-privacy",
@@ -103,6 +145,34 @@
     "where": "README and runtime contract",
     "test": "cargo test runtime_defaults_to_port_and_local_paths",
     "sandbox": "construct runtime configuration without environment values and assert the port and local paths default"
+  },
+  {
+    "id": "runtime-storage",
+    "claim": "The server creates DATA_DIR and persists seller workspace data in SQLite",
+    "where": "README run and deployment sections",
+    "test": "cargo test runtime_creates_and_reopens_sqlite_storage",
+    "sandbox": "fresh temporary directory; boot the storage layer, assert every seller data table exists, write representative data, reopen SQLite, and read it back"
+  },
+  {
+    "id": "container-runtime",
+    "claim": "The container builds the frontend and server, runs non-root, and uses /app/data for SQLite",
+    "where": "README deployment section",
+    "test": "npx vitest run --testNamePattern @claim:container-runtime",
+    "sandbox": "inspect the shipped Dockerfile for both build stages, the non-root runtime user, data path, volume, and default port"
+  },
+  {
+    "id": "health-build",
+    "claim": "/health returns the supplied build SHA",
+    "where": "README deployment section",
+    "test": "cargo test health_returns_supplied_build_sha",
+    "sandbox": "construct the health response with a known build SHA and assert the response returns it unchanged"
+  },
+  {
+    "id": "browser-storage",
+    "claim": "Session storage holds the sign-in token; local storage holds the license verdict and isolated demo keys",
+    "where": "README deployment section, privacy page",
+    "test": "npm test -- --grep @claim:browser-storage",
+    "sandbox": "fresh browser context with recorded license verification; inspect exact session, license, and demo keys, then leave demo and assert its keys are discarded"
   },
   {
     "id": "client-data-control",

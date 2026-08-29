@@ -9,6 +9,10 @@ describe('catalogue files',()=>{
     expect(money(rows[0].price_cents,'GBP')).toBe('POA');
   });
   it('rejects missing required headings',()=>expect(()=>parseCsv('title,price\nCup,2')).toThrow(/sku column/));
+  it('@claim:csv-header-normalization accepts mixed-case CSV headings',()=>{
+    const rows=parseCsv('SKU,Name,Description,CATEGORY,Price,Stock Note\nMIX-1,Display tray,Oak tray,Service,14.50,Made to order');
+    expect(rows[0]).toMatchObject({sku:'MIX-1',name:'Display tray',description:'Oak tray',category:'Service',price_cents:1450,stock_note:'Made to order'});
+  });
   it('writes one CSV row per request line',()=>{
     const csv=requestsCsv(sampleRequests);
     expect(csv.split('\n')).toHaveLength(3);
