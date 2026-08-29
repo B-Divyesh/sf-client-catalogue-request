@@ -1,1 +1,1 @@
-Turn repeat orders into structured quote requests from a private client catalogue.
+Turn repeat orders into clear quote requests from a private client catalogue.

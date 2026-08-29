@@ -8,7 +8,7 @@ Live product: <https://client-catalogue-request.sociobot.in>
 
 ## Try the sandbox
 
-Choose **Try it with sample data**, open `/?demo=1`, or visit <https://client-catalogue-request.sociobot.in/?demo=1>. The isolated demo includes six realistic products, two POA prices, stock notes, a request basket, and a seeded seller inbox. The browser stores the sample workspace and requests under `demo:` keys. The server does not retain demo requests. Use **Reset demo** to remove that sample data and create a clean workspace.
+Choose **Try it with sample data**, open `/?demo=1`, or visit <https://client-catalogue-request.sociobot.in/?demo=1>. The isolated demo includes six sample products, two POA prices, stock notes, a request basket, and a seeded seller inbox. The browser stores the sample workspace and requests under `demo:` keys. The server does not retain demo requests. Use **Reset demo** to remove that sample data and create a clean workspace.
 
 ## Seller workflow
 
@@ -17,7 +17,7 @@ Choose **Try it with sample data**, open `/?demo=1`, or visit <https://client-ca
 3. Create a named client link and share it with that client.
 4. Review incoming requests in the workspace. Export all lines to CSV or print a request to PDF.
 
-The free workspace supports 12 catalogue rows and one client link. Request export stays free. The ₹1,499 one-time license supports more rows and links, with up to 5,000 rows per import. Checkout and license checks use the Sociobot billing API. The app has no payment-card fields.
+The free workspace supports 12 catalogue rows and one client link. Request export stays free. The $15.71 USD one-time license supports more rows and links, with up to 5,000 rows per import. Checkout and license checks use the Sociobot billing API. The app has no payment-card fields.
 
 ## Run locally
 

@@ -1,6 +1,6 @@
 # Landing-page copy audit
 
-Audited 2026-08-29 after polish round 1. Counts treat hyphenated terms, numbers, and acronyms as one word. No sentence exceeds 22 words, contains a banned term, or uses a metaphor as a section heading.
+Audited 2026-08-29 after polish round 2. Counts treat hyphenated terms, numbers, and acronyms as one word. No sentence exceeds 22 words, contains a banned term, or uses a metaphor as a section heading.
 
 | Copy | Words | Result |
 |---|---:|---|
@@ -10,18 +10,17 @@ Audited 2026-08-29 after polish round 1. Counts treat hyphenated terms, numbers,
 | Seller workspace | 2 | Pass |
 | Privacy | 1 | Pass |
 | Private catalogue · structured requests | 4 | Pass |
-| Turn repeat orders into clear requests | 7 | Pass |
+| Turn repeat orders into clear requests | 6 | Pass |
 | For small B2B sellers who need client orders without running an online store. | 13 | Pass |
-| Try it with sample data | 6 | Pass |
+| Try it with sample data | 5 | Pass |
 | Opens a private sample catalogue. | 5 | Pass |
 | No setup. | 2 | Pass |
 | No checkout or card data | 5 | Pass |
 | Prices can stay POA | 4 | Pass |
 | Client links are hard to guess | 6 | Pass |
 | Glass product sheets flowing into one organized request document. | 9 | Pass |
-| One private catalogue. | 3 | Pass |
-| One request you can use. | 5 | Pass |
-| 01 / CLIENT REQUESTS | 4 | Pass |
+| Catalogue lines become one quote request with SKUs and quantities. | 10 | Pass |
+| 01 / CLIENT REQUESTS | 3 | Pass |
 | How client requests work | 4 | Pass |
 | Import your catalogue CSV. | 4 | Pass |
 | Share a protected link. | 4 | Pass |
@@ -37,17 +36,17 @@ Audited 2026-08-29 after polish round 1. Counts treat hyphenated terms, numbers,
 | The catalogue does not expose stock counts. | 7 | Pass |
 | Export each request | 3 | Pass |
 | Download the lines as CSV or print a clean request sheet to PDF. | 13 | Pass |
-| 03 / SERVICE BOUNDARIES | 4 | Pass |
+| 03 / SERVICE BOUNDARIES | 3 | Pass |
 | What this service does not do | 6 | Pass |
 | Use it to collect quote requests. | 6 | Pass |
 | Confirm prices, stock, shipping, and fulfilment outside this service. | 9 | Pass |
 | Read how request data is handled | 6 | Pass |
-| 04 / WORKSPACE LIMITS | 4 | Pass |
+| 04 / WORKSPACE LIMITS | 3 | Pass |
 | Free and paid workspace limits | 5 | Pass |
 | The free workspace supports 12 catalogue rows and one client link. | 11 | Pass |
 | Request export stays free. | 4 | Pass |
-| ₹1,499 one-time | 2 | Pass |
-| Use more than 12 catalogue rows and create more than one client link. | 12 | Pass |
+| $15.71 USD one-time | 3 | Pass |
+| Use more than 12 catalogue rows and create more than one client link. | 13 | Pass |
 | Buy the full workspace | 4 | Pass |
 | Have a license? Paste it | 5 | Pass |
 | Restore license | 2 | Pass |

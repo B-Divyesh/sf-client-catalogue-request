@@ -92,10 +92,17 @@
   },
   {
     "id": "paid-license",
-    "claim": "The ₹1,499 one-time license raises the 12-row and one-link free limits",
+    "claim": "A verified one-time license raises the 12-row and one-link free limits",
     "where": "landing paid tier and README",
     "test": "npm test -- --grep '@claim:paid-license(?!-invalid)'",
     "sandbox": "fresh seller tenant and recorded valid Sociobot response; consume the return token, save 13 rows, and create two active client links through the real backend"
+  },
+  {
+    "id": "billing-price",
+    "claim": "The full workspace costs $15.71 USD as a one-time purchase",
+    "where": "landing paid tier, seller workspace, README, Sociobot checkout",
+    "test": "npm test -- --grep @claim:billing-price",
+    "sandbox": "fresh browser context; follow the real Sociobot checkout handoff into a recorded checkout fixture and assert the product name, $15.71 total, USD currency, and one-time cadence"
   },
   {
     "id": "billing-handoff",
@@ -187,6 +194,20 @@
     "where": "seller sign-in page",
     "test": "cargo test sellers_are_isolated",
     "sandbox": "fresh in-memory database; create two seller subjects and assert one seller cannot read the other's catalogue"
+  },
+  {
+    "id": "sociobot-sign-in",
+    "claim": "Sellers can sign in with Sociobot and open their own workspace",
+    "where": "seller workflow and seller sign-in page",
+    "test": "npm test -- --grep @claim:sociobot-sign-in",
+    "sandbox": "fresh browser context; assert the hosted CIAM redirect and product scope, then return a recorded seller identity through /auth/callback and assert its isolated workspace opens"
+  },
+  {
+    "id": "named-client-links",
+    "claim": "A seller can create a client link with a saved client or group name",
+    "where": "landing workflow, seller workflow, seller workspace",
+    "test": "npm test -- --grep @claim:named-client-links",
+    "sandbox": "fresh seller workspace; create a link named Juniper Corner, reload the workspace, and assert the label remains beside its generated catalogue link"
   },
   {
     "id": "paid-license-invalid",

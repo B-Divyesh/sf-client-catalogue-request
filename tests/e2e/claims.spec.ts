@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const checkoutFixture=readFileSync(resolve(process.cwd(),'tests/fixtures/sociobot-checkout.html'),'utf8');
 
 test('@claim:demo-isolation demo requests stay in the demo namespace',async({page})=>{
   const outside:string[]=[];
@@ -125,6 +129,19 @@ test('@claim:billing-handoff uses Sociobot for checkout and locks a refunded lic
   await expect(page.getByRole('status')).toContainText('License no longer active');
 });
 
+test('@claim:billing-price checkout matches the advertised USD one-time price',async({page})=>{
+  const checkoutUrl='https://api.sociobot.in/api/v1/products/client-catalogue-request/checkout';
+  await page.route(checkoutUrl,route=>route.fulfill({status:200,contentType:'text/html',body:checkoutFixture}));
+  await page.goto('/');
+  await expect(page.getByText('$15.71 USD')).toBeVisible();
+  await page.getByRole('link',{name:'Buy the full workspace'}).click();
+  await expect(page).toHaveURL(checkoutUrl);
+  await expect(page.getByRole('heading',{level:2,name:'Client Catalogue Request'})).toBeVisible();
+  await expect(page.getByText('Pay in USD')).toBeVisible();
+  await expect(page.getByText('One-time full workspace license for Client Catalogue Request.')).toBeVisible();
+  await expect(page.getByRole('definition')).toHaveText('$15.71');
+});
+
 test('@claim:browser-storage keeps sign-in, license, and demo data in their documented namespaces',async({page})=>{
   await page.addInitScript(()=>sessionStorage.setItem('ccr:session','test-seller:storage-claim'));
   await page.route('https://api.sociobot.in/api/v1/products/client-catalogue-request/verify?license=storage-license',route=>route.fulfill({json:{valid:true,reason:'ok',expires_at:null}}));
@@ -194,7 +211,7 @@ test('client-side navigation moves focus to the new page heading',async({page})=
   await expect(page.getByRole('heading',{level:1,name:'Turn repeat orders into clear requests'})).toBeFocused();
 });
 
-test('production policy allows Entra discovery and requests the seller API scope',async({page},testInfo)=>{
+test('@claim:sociobot-sign-in redirects with the product scope and opens the recorded seller workspace',async({page},testInfo)=>{
   test.skip(testInfo.project.name==='mobile','The same shared sign-in configuration is verified once.');
   const consoleErrors:string[]=[];
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
@@ -210,6 +227,16 @@ test('production policy allows Entra discovery and requests the seller API scope
   await expect(page).toHaveTitle(/Sign in to your account/);
   expect(await page.locator('body').innerText()).not.toContain('AADSTS');
   expect(consoleErrors.filter(error=>error.includes('Content Security Policy'))).toEqual([]);
+
+  if(!process.env.PLAYWRIGHT_BASE_URL){
+    const seller=`signin-claim-${Date.now()}-${Math.random()}`;
+    await page.goto('http://127.0.0.1:8080/');
+    await page.evaluate(token=>sessionStorage.setItem('ccr:session',token),`test-seller:${seller}`);
+    await page.goto('http://127.0.0.1:8080/auth/callback');
+    await expect(page.getByRole('heading',{name:'Prepare links. Receive clean requests.'})).toBeVisible();
+    await expect(page.getByText('Free workspace · 12 rows · 1 link')).toBeVisible();
+    await expect(page.getByText('No products yet')).toBeVisible();
+  }
 });
 
 test('mobile controls meet touch and text-reflow boundaries',async({page},testInfo)=>{
@@ -360,6 +387,22 @@ test('@claim:print-request opens a print-ready request',async({page},testInfo)=>
   expect(await page.evaluate(()=>(window as Window & {printed?:boolean}).printed)).toBe(true);
 });
 
+test('@claim:named-client-links preserves a client name after reload',async({page},testInfo)=>{
+  test.skip(testInfo.project.name==='mobile'||Boolean(process.env.PLAYWRIGHT_BASE_URL),'The persistent recorded seller fixture runs once against the local test backend.');
+  const seller=`named-link-claim-${Date.now()}-${Math.random()}`;
+  await page.addInitScript(token=>sessionStorage.setItem('ccr:session',token),`test-seller:${seller}`);
+  await page.goto('/manage');
+  await page.getByLabel('Client or group name').fill('Juniper Corner');
+  await page.getByRole('button',{name:'Create client link'}).click();
+  const savedLink=page.locator('.link-list > div').filter({hasText:'Juniper Corner'});
+  await expect(savedLink.getByText('Juniper Corner',{exact:true})).toBeVisible();
+  await expect(savedLink.getByRole('link',{name:/Open catalogue/})).toHaveAttribute('href',/^\/c\/[A-Za-z0-9]{28}$/);
+  await page.reload();
+  const reloadedLink=page.locator('.link-list > div').filter({hasText:'Juniper Corner'});
+  await expect(reloadedLink.getByText('Juniper Corner',{exact:true})).toBeVisible();
+  await expect(reloadedLink.getByText('Active',{exact:true})).toBeVisible();
+});
+
 test('@claim:paid-license a verified license raises backend row and link limits',async({page},testInfo)=>{
   test.skip(testInfo.project.name==='mobile','The entitlement boundary is exercised once against the shared backend.');
   const seller=`paid-claim-${Date.now()}-${Math.random()}`;
@@ -369,7 +412,7 @@ test('@claim:paid-license a verified license raises backend row and link limits'
   await page.route('https://api.sociobot.in/api/v1/products/client-catalogue-request/verify?license=test-license',route=>route.fulfill({json:{valid:true,reason:'ok',expires_at:null}}));
   await page.goto('/?license=test-license');
   await expect(page).toHaveURL('/');
-  await expect(page.getByText('₹1,499')).toBeVisible();
+  await expect(page.getByText('$15.71 USD')).toBeVisible();
   await expect(page.getByText('Use more than 12 catalogue rows and create more than one client link.')).toBeVisible();
   await expect(page.getByRole('link',{name:'Buy the full workspace'})).toHaveAttribute('href','https://api.sociobot.in/api/v1/products/client-catalogue-request/checkout');
   await expect.poll(()=>page.evaluate(()=>localStorage.getItem('sb_license:client-catalogue-request'))).toBe('test-license');
