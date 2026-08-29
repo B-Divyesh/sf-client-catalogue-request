@@ -285,6 +285,32 @@ test('mobile controls meet touch and text-reflow boundaries',async({page},testIn
   const priceHeaderBox=await page.getByRole('columnheader',{name:'Unit price'}).boundingBox();
   expect(priceHeaderBox?.x).toBeGreaterThanOrEqual(wrapBox?.x||0);
   expect((priceHeaderBox?.x||0)+(priceHeaderBox?.width||0)).toBeLessThanOrEqual((wrapBox?.x||0)+(wrapBox?.width||0)+1);
+
+  // A real request carries the backend's long RFC3339 timestamp, unlike the short seeded sample.
+  await page.goto('/demo');
+  await page.getByRole('button',{name:'Add to request'}).first().click();
+  await page.getByRole('button',{name:/Review request/}).click();
+  await page.getByLabel('Your name').fill('Maya Patel');
+  await page.getByLabel('Company').fill('Juniper Corner');
+  await page.getByLabel('Email').fill('maya@example.test');
+  await page.getByRole('button',{name:'Send quote request'}).click();
+  await expect(page.getByRole('heading',{name:/Request RQ-DEMO-/})).toBeVisible();
+  await page.goto('/demo/inbox');
+  await page.evaluate(()=>document.documentElement.style.fontSize='200%');
+  const timestamp=page.locator('.request-card time').first();
+  await expect(timestamp).toHaveText(/^\d{4}-\d{2}-\d{2}T.+\+00:00$/);
+  expectInboxToReflow(await inboxGeometry());
+  const timestampGeometry=await timestamp.evaluate(node=>{
+    const element=node as HTMLElement;
+    const box=element.getBoundingClientRect();
+    return {left:box.left,right:box.right,clientWidth:element.clientWidth,scrollWidth:element.scrollWidth,overflowWrap:getComputedStyle(element).overflowWrap};
+  });
+  expect(timestampGeometry.overflowWrap).toBe('anywhere');
+  expect(timestampGeometry.left).toBeGreaterThanOrEqual(0);
+  expect(timestampGeometry.right).toBeLessThanOrEqual(320);
+  expect(timestampGeometry.scrollWidth).toBeLessThanOrEqual(timestampGeometry.clientWidth);
+  await page.evaluate(()=>window.scrollTo({left:9999}));
+  expect(await page.evaluate(()=>window.scrollX)).toBe(0);
 });
 
 test('public routes keep the document skeleton and load without console errors',async({page})=>{
