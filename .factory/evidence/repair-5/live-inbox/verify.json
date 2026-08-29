@@ -1,0 +1,14 @@
+{
+  "url": "https://client-catalogue-request.sociobot.in/demo/inbox",
+  "loadMs": 556,
+  "errors": [],
+  "a11y": {
+    "title": "Demo seller inbox — Client Catalogue Request",
+    "lang": "en",
+    "h1": 1,
+    "main": true,
+    "imgsMissingAlt": 0,
+    "buttonsUnlabeled": 0,
+    "textLength": 780
+  }
+}

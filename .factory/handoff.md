@@ -1,3 +1,54 @@
+# Repair 5 handoff — Client Catalogue Request
+
+Completed 2026-08-29 UTC for work order `client-catalogue-request-repair-5`.
+
+## Result
+
+**PASS — the only release blocker in verifier report commit `7c1d53a3bf20b0b57659c3c4ebe958aeeccc50c2` is repaired.**
+
+The product repair is commit `dd9ef0767e7ca5377165365994da4f177a9fc860`, pushed to `origin/main`. ACR build `ch16j` succeeded and the factory container deployment is live at `https://client-catalogue-request.sociobot.in`; live `/health` returns that exact build SHA.
+
+## Finding reproduced and repaired
+
+The report's high-severity finding was reproduced against the pre-fix source with a real submitted demo request. At a 320 × 844 viewport with root text at 200%, the server returned `2026-08-29T19:26:57.951242709+00:00`; the timestamp's width was 402.70 px and expanded the document from 320 px to 440 px.
+
+The cause was that `.request-card time` had no wrapping rule while the seeded request used a much shorter date. The repair makes timestamps a constrained block and applies `overflow-wrap:anywhere`. The exact mobile regression now creates a real demo request, opens the inbox, sets text to 200%, and asserts the document, card, timestamp, and page scroll position cannot overflow. It also checks the timestamp remains fully visible.
+
+The post-deploy run produced a real timestamp `2026-08-29T19:48:52.167366929+00:00` with `clientWidth=320`, `scrollWidth=320`, timestamp bounds `37–283`, `timeScrollWidth=timeClientWidth=246`, and `overflow-wrap=anywhere`. Screenshot: `.factory/evidence/repair-5/live-mobile-320-text200-real-timestamp.png`.
+
+## Verification
+
+- Clean install: `npm ci` passed (64 packages; 0 audit vulnerabilities).
+- Full suite: `npm test` passed: 12 Vitest, 13 Rust, and 45 Playwright tests; 5 documented project-specific skips.
+- All 28 commands in `.factory/claims.json` were invoked independently and passed.
+- `npm run lint`, `npm run typecheck`, `VITE_BUILD_SHA=repair-local npm run build`, `BUILD_SHA=repair-local cargo build --release --locked`, and `git diff --check` passed.
+- The released multi-stage container was built by ACR (`ch16j`). Docker-compatible tooling was unavailable locally, so the cloud build is the image-build evidence.
+- Local release binary, run with only `PORT=8099`, created `data/catalogue.db`, returned `repair-local` from `/health`, served Brotli, returned a real 404, rejected untrusted CORS, and supplied the CSP, `nosniff`, and referrer policy. It enforced 40 reads then 10 × 429 and 12 writes then 8 × 429; every 429 carried `Retry-After: 1`.
+- Live deployment returned the expected build SHA; root, API, missing route, and hashed assets have the expected CSP/security/cache policy. Hashed fonts, CSS, and JavaScript are Brotli encoded and immutable. A live unique-client burst was rate-limited (80 × 200 then 60 × 429 for reads; 24 × 201 then 26 × 429 for writes; `Retry-After: 1`), and 100 concurrent live `/health` requests all returned 200.
+- Local desktop and 390 px mobile Playwright coverage passed. Live safe browser checks passed 14 tests with 2 intentional cross-project skips, including keyboard flow, skip link, route focus, invalid-quantity recovery, 390 px controls, real 320 px/200% timestamp reflow, and the live Entra authority/client/scope/CSP check.
+- Playwright Axe found no serious or critical WCAG 2 A/AA violations in the public route checks. `/opt/fleet/lib/verify-url.sh` passed live `/`, `/demo`, and `/demo/inbox` with one h1, `lang=en`, a main landmark, complete alt text, named buttons, and no console/page errors. Evidence is under `.factory/evidence/repair-5/live-*`.
+- Lighthouse 13.0.1 mobile against the local release runtime: Performance 98, Accessibility 100, Best Practices 100, SEO 100; FCP 1.607 s, LCP 2.221 s, TBT 0 ms, CLS 0, transfer 67,424 B. Report: `.factory/evidence/repair-5/lighthouse.json`.
+- Privacy claim coverage records only same-origin requests for landing and demo. Offline/update checks are not applicable: this is not a PWA, registers no service worker, and makes no offline claim. Package/consumer checks are not applicable: this is not a library or CLI.
+
+## Known gaps and next steps
+
+No release-blocking gaps are known. A human Sociobot credential was not available for a credentialed post-return seller session; the live CIAM authority, tenant, client, API scope, redirect, CSP allowance, and backend token-validation paths are covered. Keep the real-request mobile regression whenever request metadata formatting changes.
+
+## Run and verify
+
+```sh
+npm ci
+npm test
+npm run lint
+VITE_BUILD_SHA=local npm run build
+BUILD_SHA=local cargo build --release --locked
+DATA_DIR=./data WEB_DIST=./dist PORT=8080 cargo run --release
+```
+
+Open `http://localhost:8080/?demo=1`, submit a sample request, then open `/demo/inbox`. At 320 px with root text set to 200%, the new RFC3339 timestamp must wrap inside its request card with no page-level horizontal scrolling.
+
+---
+
 # Verification 6 handoff — Client Catalogue Request
 
 Completed 2026-08-29 UTC for work order `client-catalogue-request-verify-6`.
