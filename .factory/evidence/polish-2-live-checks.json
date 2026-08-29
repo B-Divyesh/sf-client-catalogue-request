@@ -1,0 +1,36 @@
+{
+  "url": "https://client-catalogue-request.sociobot.in",
+  "build_sha": "78e6cf00b4571e6e77c71259ab55c1027b8ee882",
+  "console_errors": [],
+  "routes": {
+    "/": { "status": 200, "axe_serious_or_critical": 0 },
+    "/?demo=1": { "status": 200, "axe_serious_or_critical": 0 },
+    "/demo": { "status": 200, "axe_serious_or_critical": 0 },
+    "/demo/inbox": { "status": 200, "axe_serious_or_critical": 0 },
+    "/privacy": { "status": 200, "axe_serious_or_critical": 0 },
+    "/terms": { "status": 200, "axe_serious_or_critical": 0 },
+    "/manage": { "status": 200, "axe_serious_or_critical": 0 },
+    "/missing-page": { "status": 404, "axe_serious_or_critical": 0 }
+  },
+  "demo": {
+    "one_click_query_url": true,
+    "banner_visible": true,
+    "sample_products": 6,
+    "reset_replaced_workspace": true,
+    "exit_removed_demo_keys": true
+  },
+  "routing": { "forward_heading_focus": true, "back_heading_focus": true },
+  "privacy": { "landing_and_demo_origins": ["https://client-catalogue-request.sociobot.in"] },
+  "mobile": { "width_css_px": 320, "root_text_percent": 200, "document_overflow": false },
+  "checkout": {
+    "product": "Client Catalogue Request",
+    "amount": "$15.71",
+    "currency": "USD",
+    "cadence": "one-time"
+  },
+  "ciam": {
+    "authority": "https://sociobotcustomers.ciamlogin.com",
+    "scope": "api://25c704f4-465a-47af-80ab-2c489466b697/access_as_user",
+    "hosted_page_error": false
+  }
+}

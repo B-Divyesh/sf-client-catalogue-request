@@ -1,0 +1,26 @@
+# Polish round 2 — cumulative finding closure
+
+Completed 2026-08-29 UTC for work order `client-catalogue-request-polish-2`. Review base: `930d1ceae1707ee96c497eb3c346b829c71a7d6c`. Product repair: `78e6cf00b4571e6e77c71259ab55c1027b8ee882`. ACR run `ch187` deployed that exact SHA to <https://client-catalogue-request.sociobot.in>.
+
+## Finding map
+
+| Finding | Change made | Test evidence | Screenshot and live evidence |
+|---|---|---|---|
+| `F-1-1` — public claims lacked observable tests | Retained all earlier claim coverage and expanded the manifest from 28 to 31 entries for checkout price, Sociobot sign-in, and named client links. Each entry still names one exact sandbox command. | `claims manifest has unique IDs and a real test for every declared claim`; all 31 exact commands passed independently from clean clone `/tmp/client-catalogue-polish-2-clean.6zcJZ7`. | [Live landing](evidence/polish-2-live-landing/screenshot-desktop.png); live cold check found no stale or unlisted reviewed claim. |
+| `F-1-2` — metaphorical headings | Kept the literal section names from round 1 and the designed 404 heading “Page not found”. | `public routes keep the document skeleton and load without console errors`; copy audit has no metaphor or banned-word flags. | [Live landing mobile](evidence/polish-2-live-landing/screenshot-mobile.png); live `/missing-page` returned HTTP 404. |
+| `F-1-3` — catalogue/product-list terminology | Kept **catalogue** as the single term in the interface, metadata, and README. | `rg -i 'product list' src README.md index.html` returned no match. | [Live landing](evidence/polish-2-live-landing/screenshot-desktop.png); live description says “Share a private catalogue…”. |
+| `F-1-4` — demo inbox absent from sitemap | Kept `/demo/inbox` in `public/sitemap.xml`. | Public-route regression and direct sitemap assertion passed. | Live `https://client-catalogue-request.sociobot.in/sitemap.xml` returned 200 and lists `/demo/inbox`, `/privacy`, and `/terms`. |
+| `F-2-1` — advertised price differed from checkout and the test could not detect it | Replaced every ₹1,499 statement with the live amount, **$15.71 USD one-time**, on landing, seller workspace, README, copy audit, and claims. Added a recorded Sociobot checkout fixture and an outcome test that follows the checkout handoff and verifies product, amount, currency, and cadence. | `@claim:billing-price checkout matches the advertised USD one-time price`; `@claim:paid-license a verified license raises backend row and link limits`. | [Hosted checkout](evidence/polish-2-live-checkout/screenshot-desktop.png); cold live checkout showed “Pay in USD”, “Client Catalogue Request”, `$15.71`, and “One-time full workspace license…”. |
+| `F-2-2` — sign-in and named-link claims were absent | Added `sociobot-sign-in` and `named-client-links` manifest entries. The sign-in test checks the real CIAM redirect, exact product scope, recorded callback identity, and resulting isolated workspace. The link test creates “Juniper Corner”, reloads, and checks the saved label beside its 28-character catalogue link. | `@claim:sociobot-sign-in redirects with the product scope and opens the recorded seller workspace`; `@claim:named-client-links preserves a client name after reload`. | [Hosted Sociobot sign-in](evidence/polish-2-live-signin/screenshot-desktop.png); live redirect used the required CIAM authority and `access_as_user` scope without an AADSTS error. |
+| `F-2-3` — hero caption was a slogan | Rewrote it as “Catalogue lines become one quote request with SKUs and quantities.” | Updated `.factory/copy-audit.md`; full browser suite and cold first-screen check passed. | [Live landing mobile](evidence/polish-2-live-landing/screenshot-mobile.png); exact caption present at the live root. |
+| `F-2-4` — “realistic” was subjective | Changed README and the claims manifest to “six sample products”. | `rg 'realistic products' README.md .factory/claims.json` returned no match; `@claim:demo-sample-content` still proves the exact sample contents. | [Live direct demo](evidence/polish-2-live-demo/screenshot-desktop.png); six products, two POA prices, stock notes, basket, and seeded inbox verified. |
+
+## Required regression checks
+
+- `/?demo=1` remains a one-click isolated sample. Reset replaces its random workspace; **Start for real** deletes every `demo:` key. [Live demo mobile](evidence/polish-2-live-demo/screenshot-mobile.png).
+- `/`, `/?demo=1`, `/demo`, `/demo/inbox`, `/privacy`, `/terms`, `/manage`, and `/missing-page` passed title, metadata, canonical, h1, landmark, footer, focus, Back, and Axe checks. The last route returned HTTP 404. Full result: [live checks](evidence/polish-2-live-checks.json).
+- At 390 px and at 320 px with 200% root text, the document stayed viewport-wide and controls remained visible. [Live inbox mobile](evidence/polish-2-live-inbox/screenshot-mobile.png).
+- Landing and demo traffic remained same-origin. No service worker is registered and the product makes no offline claim.
+- The illuminated-order-desk identity is unchanged: navy glass surfaces, mint actions, amber cautions, clipped sheets, self-hosted Sora, and original generated artwork.
+
+No finding from review 1 or review 2 remains unresolved.

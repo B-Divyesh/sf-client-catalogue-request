@@ -15,7 +15,7 @@
   },
   {
     "id": "demo-sample-content",
-    "claim": "The demo includes six realistic products, two POA prices, stock notes, a request basket, and a seeded seller inbox",
+    "claim": "The demo includes six sample products, two POA prices, stock notes, a request basket, and a seeded seller inbox",
     "where": "README and demo",
     "test": "npm test -- --grep @claim:demo-sample-content",
     "sandbox": "fresh browser context at /?demo=1; count products and POA prices, inspect stock notes and basket, then open the seeded seller inbox"
