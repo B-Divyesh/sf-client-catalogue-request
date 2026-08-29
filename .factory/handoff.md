@@ -1,3 +1,30 @@
+# Review 2 handoff — Client Catalogue Request
+
+Completed 2026-08-29 UTC for work order `client-catalogue-request-review-2`.
+
+## Result
+
+**FAIL.** The complete report is `.factory/review-2.md`. No product code was changed.
+
+Four findings remain: the landing/README advertise ₹1,499 while the linked live checkout shows $15.71; the price test does not inspect checkout; public Sociobot sign-in and named-client-link capabilities are absent from `.factory/claims.json`; the hero caption contains a non-informative slogan; and the README calls sample products “realistic”. The price and claims-contract findings are blocking.
+
+## Verification performed
+
+- Opened the live site cold in fresh 390 × 844 and 1440 × 900 Chromium contexts.
+- Exercised one-click demo entry, sample content, Reset, Start for real, real-key preservation, and request logging; demo traffic was same-origin only.
+- Ran all 28 exact claims-manifest commands independently from clean clone `/tmp/client-catalogue-review-2.PFpkTg`; all passed.
+- Ran `npm test` in that clone: 12 Vitest, 13 Rust, and 45 Playwright passed; 5 project-specific skips.
+- Ran `npm run lint`; it passed.
+- Ran live route, title, metadata, canonical, h1, footer, link, 404, focus/back, keyboard, mobile reflow, factory URL verifier, and Axe checks. The safe route subset passed 8/8, the isolated mobile regression passed, and Axe reported zero WCAG 2 A/AA violations on eight routes.
+- Followed the live billing handoff. Sociobot redirected to Dodo checkout, which displayed “Pay in USD” and `$15.71` for the one-time license.
+- Rechecked every earlier review/polish/handoff finding in live behavior and code. All earlier functional/mobile defects remain fixed; the public-claims finding is reopened by the omissions and price assertion above.
+
+## Next steps
+
+Align the public price with checkout, add an outcome-based checkout-price test, add manifest coverage for Sociobot sign-in and named client links, and make the two copy rewrites. Then repeat the full review; zero findings are required for PASS.
+
+---
+
 # Verification 7 handoff — Client Catalogue Request
 
 Completed 2026-08-29 UTC for work order `client-catalogue-request-verify-7`.
