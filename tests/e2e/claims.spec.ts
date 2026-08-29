@@ -86,10 +86,51 @@ test('the request basket works from the keyboard',async({page})=>{
   await expect(page.getByRole('dialog')).not.toBeVisible();
 });
 
+test('an out-of-range quantity is announced and never submitted',async({page})=>{
+  await page.goto('/demo');
+  await page.getByRole('button',{name:'Add to request'}).first().click();
+  await page.getByRole('button',{name:/Review request/}).click();
+  const quantity=page.getByLabel('Quantity');
+  await page.getByLabel('Your name').fill('Maya Patel');
+  await page.getByLabel('Company').fill('Juniper Corner');
+  await page.getByLabel('Email').fill('maya@example.test');
+  for(const invalid of ['0','10000']){
+    await quantity.fill(invalid);
+    await page.getByRole('button',{name:'Send quote request'}).click();
+    await expect(page.getByRole('alert')).toContainText('Enter a whole number from 1 to 9,999.');
+    await expect(quantity).toHaveValue(invalid);
+    expect(await page.evaluate(()=>localStorage.getItem('demo:client-catalogue-request:submitted'))).toBeNull();
+  }
+
+  await quantity.fill('25');
+  await page.getByRole('button',{name:'Send quote request'}).click();
+  await expect(page.getByRole('heading',{name:/Request RQ-DEMO-/})).toBeVisible();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('demo:client-catalogue-request:submitted')||'[]')[0].lines[0].quantity)).toBe(25);
+});
+
 test('the first keyboard stop is the skip link',async({page})=>{
   await page.goto('/');
   await page.keyboard.press('Tab');
   await expect(page.locator('.skip')).toBeFocused();
+});
+
+test('client-side navigation moves focus to the new page heading',async({page})=>{
+  await page.goto('/');
+  await page.locator('.site-header nav').getByRole('link',{name:'Demo'}).click();
+  await expect(page.getByRole('heading',{level:1,name:'Northline Supply Co.'})).toBeFocused();
+});
+
+test('production policy allows Entra discovery and requests the seller API scope',async({page},testInfo)=>{
+  test.skip(testInfo.project.name==='mobile','The same shared sign-in configuration is verified once.');
+  const consoleErrors:string[]=[];
+  page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
+  const response=await page.goto(process.env.PLAYWRIGHT_BASE_URL?'/manage':'http://127.0.0.1:8080/manage');
+  expect(response?.headers()['content-security-policy']).toContain('connect-src \'self\' https://api.sociobot.in https://sociobotcustomers.ciamlogin.com');
+  const authorize=page.waitForRequest(request=>request.url().includes('sociobotcustomers.ciamlogin.com')&&request.url().includes('/oauth2/v2.0/authorize'));
+  await page.getByRole('button',{name:'Sign in with Sociobot'}).click();
+  const request=await authorize;
+  expect(new URL(request.url()).searchParams.get('scope')).toContain('api://25c704f4-465a-47af-80ab-2c489466b697/access_as_user');
+  expect(consoleErrors.filter(error=>error.includes('Content Security Policy'))).toEqual([]);
 });
 
 test('mobile controls meet touch and text-reflow boundaries',async({page},testInfo)=>{
@@ -99,16 +140,22 @@ test('mobile controls meet touch and text-reflow boundaries',async({page},testIn
     const boxes=await page.locator(selector).evaluateAll(nodes=>nodes.map(node=>{const box=(node as HTMLElement).getBoundingClientRect();return {width:box.width,height:box.height};}));
     for(const box of boxes.filter(box=>box.width>0&&box.height>0)){expect(box.width,selector).toBeGreaterThanOrEqual(44);expect(box.height,selector).toBeGreaterThanOrEqual(44);}
   }
+  await page.goto('/');
+  const privacyLink=await page.getByRole('link',{name:'Read how request data is handled'}).boundingBox();
+  expect(privacyLink?.height).toBeGreaterThanOrEqual(44);
+  await page.goto('/demo/inbox');
+  const emailLink=await page.getByRole('link',{name:'maya@example.test'}).boundingBox();
+  expect(emailLink?.height).toBeGreaterThanOrEqual(44);
+  await page.goto('/demo');
   await page.setViewportSize({width:320,height:844});
   await page.evaluate(()=>document.documentElement.style.fontSize='200%');
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
-test('public routes keep the document skeleton and load without console errors',async({page},testInfo)=>{
-  test.skip(testInfo.project.name==='mobile','The mobile project covers the interactive catalogue claims.');
+test('public routes keep the document skeleton and load without console errors',async({page})=>{
   const errors:string[]=[];
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
-  for(const path of ['/','/demo','/demo/inbox','/privacy','/terms','/missing-page']){
+  for(const path of ['/','/demo','/demo/inbox','/privacy','/terms','/manage','/missing-page']){
     await page.goto(path);
     await expect(page.locator('main')).toHaveCount(1);
     await expect(page.locator('h1')).toHaveCount(1);
@@ -130,7 +177,12 @@ test('@claim:print-request opens a print-ready request',async({page},testInfo)=>
   expect(await page.evaluate(()=>(window as Window & {printed?:boolean}).printed)).toBe(true);
 });
 
-test('@claim:paid-license stores and verifies a returned license',async({page})=>{
+test('@claim:paid-license a verified license raises backend row and link limits',async({page},testInfo)=>{
+  test.skip(testInfo.project.name==='mobile','The entitlement boundary is exercised once against the shared backend.');
+  const seller=`paid-claim-${Date.now()}-${Math.random()}`;
+  await page.addInitScript(({seller})=>{
+    sessionStorage.setItem('ccr:session',`test-seller:${seller}`);
+  },{seller});
   await page.route('https://api.sociobot.in/api/v1/products/client-catalogue-request/verify?license=test-license',route=>route.fulfill({json:{valid:true,reason:'ok',expires_at:null}}));
   await page.goto('/?license=test-license');
   await expect(page).toHaveURL('/');
@@ -139,6 +191,18 @@ test('@claim:paid-license stores and verifies a returned license',async({page})=
   await expect(page.getByRole('link',{name:'Buy the full workspace'})).toHaveAttribute('href','https://api.sociobot.in/api/v1/products/client-catalogue-request/checkout');
   await expect.poll(()=>page.evaluate(()=>localStorage.getItem('sb_license:client-catalogue-request'))).toBe('test-license');
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('sb_license_cache:client-catalogue-request')||'null')?.valid)).toBe(true);
+  await page.goto('/manage');
+  await expect(page.getByText('Full workspace active')).toBeVisible();
+  const rows=['sku,name,description,category,price,stock_note'];
+  for(let n=1;n<=13;n++)rows.push(`PAID-${n},Paid product ${n},Recorded fixture,Products,10.00,Ask`);
+  await page.getByLabel('Choose a product CSV').setInputFiles({name:'paid-products.csv',mimeType:'text/csv',buffer:Buffer.from(rows.join('\n'))});
+  await page.getByRole('button',{name:'Save catalogue'}).click();
+  await expect(page.getByText('13 products')).toBeVisible();
+  for(const [index,label] of ['Buyer one','Buyer two'].entries()){
+    await page.getByLabel('Client or group name').fill(label);
+    await page.getByRole('button',{name:'Create client link'}).click();
+    await expect(page.getByRole('link',{name:/Open catalogue/})).toHaveCount(index+1);
+  }
 });
 
 test('@claim:paid-license-invalid shows an accessible inactive-license notice',async({page})=>{
@@ -158,7 +222,7 @@ test('@claim:privacy-runtime uses no third-party runtime assets',async({page})=>
 
 test('@claim:csv-import @claim:client-data-control seller import to client request works end to end',async({page},testInfo)=>{
   test.skip(testInfo.project.name==='mobile','The same responsive UI is covered by mobile claim tests.');
-  await page.addInitScript(()=>localStorage.setItem('ccr:session','test-seller:browser-e2e'));
+  await page.addInitScript(()=>sessionStorage.setItem('ccr:session','test-seller:browser-e2e'));
   await page.goto('/manage');
   await expect(page.getByRole('heading',{name:'Prepare links. Receive clean requests.'})).toBeVisible();
   await page.getByLabel('Choose a product CSV').setInputFiles({name:'products.csv',mimeType:'text/csv',buffer:Buffer.from('sku,name,description,category,price,stock_note\nT-1,Test tray,Oak tray,Service,14.50,In stock')});

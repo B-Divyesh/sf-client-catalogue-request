@@ -14,3 +14,5 @@ h1:focus{outline:none}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.button:hover,.product-card:hover{transform:none}.hero-art{transform:none}}
 
 .license-form{display:grid;gap:8px;margin-top:14px}.license-form label{display:grid;gap:6px;color:var(--mist);font-size:.82rem}.license-form .link-button{justify-self:start}.license-notice{margin:0}.danger-action{color:var(--danger)}
+.quantity-error{min-height:1.35em;color:var(--danger);font-size:.78rem}
+.limits a,.request-card header a{display:inline-flex;align-items:center;min-height:44px}

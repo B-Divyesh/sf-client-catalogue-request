@@ -59,8 +59,8 @@
     "id": "paid-license",
     "claim": "The ₹1,499 one-time license raises the 12-row and one-link free limits",
     "where": "landing paid tier and README",
-    "test": "npm test -- --grep @claim:paid-license",
-    "sandbox": "fresh browser context; mock a valid Sociobot verification response, consume the return token, and inspect the checkout link"
+    "test": "npm test -- --grep '@claim:paid-license(?!-invalid)'",
+    "sandbox": "fresh seller tenant and recorded valid Sociobot response; consume the return token, save 13 rows, and create two active client links through the real backend"
   },
   {
     "id": "stock-privacy",
@@ -122,7 +122,7 @@
     "id": "paid-license-invalid",
     "claim": "An inactive license shows a notice and keeps paid limits locked",
     "where": "license restore form",
-    "test": "npm test -- --grep @claim:paid-license-invalid",
+    "test": "npm test -- --grep '@claim:paid-license-invalid'",
     "sandbox": "fresh browser context; mock a revoked Sociobot verification response and assert the status notice and visible restore field"
   }
 ]

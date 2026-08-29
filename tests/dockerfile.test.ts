@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const dockerfile = readFileSync(resolve(process.cwd(), 'Dockerfile'), 'utf8');
+const server = readFileSync(resolve(process.cwd(), 'src/main.rs'), 'utf8');
 
 describe('container build contract', () => {
   it('uses the current stable Rust Bookworm builder', () => {
@@ -11,5 +12,9 @@ describe('container build contract', () => {
 
   it('keeps the release build locked inside the server stage', () => {
     expect(dockerfile).toMatch(/RUN cargo build --release --locked/);
+  });
+
+  it('compresses production responses', () => {
+    expect(server).toContain('.layer(CompressionLayer::new())');
   });
 });

@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build",
-    "test": "vitest run && cargo test && playwright test",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "cargo fmt --check && cargo clippy --all-targets -- -D warnings",
+    "test": "npm run build && vitest run && cargo test && playwright test",
     "test:e2e": "playwright test",
     "start": "cargo run --release"
   },

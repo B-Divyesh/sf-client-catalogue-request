@@ -11,8 +11,13 @@ use axum::{
 use serde_json::json;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{env, net::SocketAddr, path::Path};
-use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer, trace::TraceLayer};
+use tower_http::{
+    compression::CompressionLayer, services::ServeDir, set_header::SetResponseHeaderLayer,
+    trace::TraceLayer,
+};
 use tracing::info;
+
+const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://api.sociobot.in https://sociobotcustomers.ciamlogin.com; frame-src 'self' https://sociobotcustomers.ciamlogin.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.sociobot.in";
 
 struct RuntimeConfig {
     port: u16,
@@ -62,16 +67,70 @@ async fn main() -> anyhow::Result<()> {
     let app_index = index.clone();
     let missing_index = index.clone();
     let app = Router::new()
-        .route("/health", get({ let sha = build_sha.clone(); move || async move { Json(json!({"ok": true, "build_sha": sha})) } }))
+        .route(
+            "/health",
+            get({
+                let sha = build_sha.clone();
+                move || async move { Json(json!({"ok": true, "build_sha": sha})) }
+            }),
+        )
         .nest("/api", api_router(state))
-        .route("/", get({ let index=app_index.clone(); move || serve_index(index) }))
-        .route("/demo", get({ let index=app_index.clone(); move || serve_index(index) }))
-        .route("/demo/inbox", get({ let index=app_index.clone(); move || serve_index(index) }))
-        .route("/privacy", get({ let index=app_index.clone(); move || serve_index(index) }))
-        .route("/terms", get({ let index=app_index.clone(); move || serve_index(index) }))
-        .route("/manage", get({ let index=app_index.clone(); move || serve_index(index) }))
-        .route("/auth/callback", get({ let index=app_index.clone(); move || serve_index(index) }))
-        .route("/c/{token}", get({ let index=app_index.clone(); move || serve_index(index) }))
+        .route(
+            "/",
+            get({
+                let index = app_index.clone();
+                move || serve_index(index)
+            }),
+        )
+        .route(
+            "/demo",
+            get({
+                let index = app_index.clone();
+                move || serve_index(index)
+            }),
+        )
+        .route(
+            "/demo/inbox",
+            get({
+                let index = app_index.clone();
+                move || serve_index(index)
+            }),
+        )
+        .route(
+            "/privacy",
+            get({
+                let index = app_index.clone();
+                move || serve_index(index)
+            }),
+        )
+        .route(
+            "/terms",
+            get({
+                let index = app_index.clone();
+                move || serve_index(index)
+            }),
+        )
+        .route(
+            "/manage",
+            get({
+                let index = app_index.clone();
+                move || serve_index(index)
+            }),
+        )
+        .route(
+            "/auth/callback",
+            get({
+                let index = app_index.clone();
+                move || serve_index(index)
+            }),
+        )
+        .route(
+            "/c/{token}",
+            get({
+                let index = app_index.clone();
+                move || serve_index(index)
+            }),
+        )
         .nest_service("/assets", ServeDir::new(format!("{web_dist}/assets")))
         .route_service("/favicon.svg", ServeDir::new(&web_dist))
         .route_service("/robots.txt", ServeDir::new(&web_dist))
@@ -80,9 +139,19 @@ async fn main() -> anyhow::Result<()> {
         .route_service("/catalogue-template.csv", ServeDir::new(&web_dist))
         .fallback(get(move || not_found(missing_index.clone())))
         .layer(axum::middleware::from_fn(cache_assets))
-        .layer(SetResponseHeaderLayer::if_not_present(HeaderName::from_static("x-content-type-options"), HeaderValue::from_static("nosniff")))
-        .layer(SetResponseHeaderLayer::if_not_present(HeaderName::from_static("referrer-policy"), HeaderValue::from_static("strict-origin-when-cross-origin")))
-        .layer(SetResponseHeaderLayer::if_not_present(HeaderName::from_static("content-security-policy"), HeaderValue::from_static("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://api.sociobot.in; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.sociobot.in")))
+        .layer(CompressionLayer::new())
+        .layer(SetResponseHeaderLayer::if_not_present(
+            HeaderName::from_static("x-content-type-options"),
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            HeaderName::from_static("content-security-policy"),
+            HeaderValue::from_static(CONTENT_SECURITY_POLICY),
+        ))
         .layer(TraceLayer::new_for_http());
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!(%addr, %db_path, "configuration loaded; no secret environment variables required");
@@ -147,5 +216,16 @@ mod tests {
         assert_eq!(config.port, 8080);
         assert_eq!(config.data_dir, "data");
         assert_eq!(config.web_dist, "dist");
+    }
+
+    #[test]
+    fn content_security_policy_allows_sociobot_entra() {
+        assert!(CONTENT_SECURITY_POLICY
+            .split(';')
+            .any(|directive| directive.trim() == "connect-src 'self' https://api.sociobot.in https://sociobotcustomers.ciamlogin.com"));
+        assert!(CONTENT_SECURITY_POLICY
+            .split(';')
+            .any(|directive| directive.trim()
+                == "frame-src 'self' https://sociobotcustomers.ciamlogin.com"));
     }
 }

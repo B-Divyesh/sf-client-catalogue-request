@@ -21,8 +21,9 @@ use std::{
 };
 const TENANT: &str = "35c6fe40-0ec0-46b6-98c6-213ad4de6650";
 const CLIENT: &str = "25c704f4-465a-47af-80ab-2c489466b697";
+const API_SCOPE: &str = "access_as_user";
 const DISCOVERY:&str="https://sociobotcustomers.ciamlogin.com/35c6fe40-0ec0-46b6-98c6-213ad4de6650/v2.0/.well-known/openid-configuration";
-const VERIFY: &str =
+const VERIFY_BASE: &str =
     "https://api.sociobot.in/api/v1/products/client-catalogue-request/verify?license=";
 #[derive(Clone)]
 pub struct AppState {
@@ -30,6 +31,7 @@ pub struct AppState {
     rates: Arc<DashMap<String, (Instant, u32)>>,
     http: reqwest::Client,
     auth: Arc<tokio::sync::RwLock<Option<Keys>>>,
+    verify_base: String,
 }
 #[derive(Clone)]
 struct Keys {
@@ -46,6 +48,8 @@ struct Discovery {
 struct Claims {
     oid: String,
     tid: String,
+    #[serde(default)]
+    scp: String,
 }
 #[derive(Deserialize)]
 struct Verdict {
@@ -61,7 +65,16 @@ impl AppState {
                 .build()
                 .expect("HTTP client"),
             auth: Arc::new(tokio::sync::RwLock::new(None)),
+            verify_base: std::env::var("SOCIOBOT_LICENSE_VERIFY_BASE")
+                .unwrap_or_else(|_| VERIFY_BASE.into()),
         }
+    }
+
+    #[cfg(test)]
+    fn with_verify_base(pool: SqlitePool, verify_base: String) -> Self {
+        let mut state = Self::new(pool);
+        state.verify_base = verify_base;
+        state
     }
 }
 type R<T> = Result<T, (StatusCode, Json<Value>)>;
@@ -76,7 +89,7 @@ fn token(n: usize) -> String {
         .collect()
 }
 pub fn api_router(state: AppState) -> Router {
-    Router::new().route("/auth/config",get(||async{Json(json!({"authority":"https://sociobotcustomers.ciamlogin.com/35c6fe40-0ec0-46b6-98c6-213ad4de6650/","client_id":CLIENT}))})).route("/admin/catalogue",get(admin_catalogue).put(save_catalogue)).route("/admin/links",post(create_link)).route("/admin/links/{token}/revoke",post(revoke_link)).route("/admin/requests",get(list_requests)).route("/admin/requests/{id}",axum::routing::delete(delete_request)).route("/catalogue/{token}",get(client_catalogue)).route("/requests/{token}",post(create_request)).route("/demo",post(create_demo)).route("/demo/{id}/requests",get(demo_requests).post(create_demo_request).delete(delete_demo)).layer(DefaultBodyLimit::max(5*1024*1024)).layer(middleware::from_fn_with_state(state.clone(),limit)).with_state(state)
+    Router::new().route("/auth/config",get(||async{Json(json!({"authority":"https://sociobotcustomers.ciamlogin.com/35c6fe40-0ec0-46b6-98c6-213ad4de6650/","client_id":CLIENT,"scope":format!("api://{CLIENT}/{API_SCOPE}")}))})).route("/admin/catalogue",get(admin_catalogue).put(save_catalogue)).route("/admin/links",post(create_link)).route("/admin/links/{token}/revoke",post(revoke_link)).route("/admin/requests",get(list_requests)).route("/admin/requests/{id}",axum::routing::delete(delete_request)).route("/catalogue/{token}",get(client_catalogue)).route("/requests/{token}",post(create_request)).route("/demo",post(create_demo)).route("/demo/{id}/requests",get(demo_requests).post(create_demo_request).delete(delete_demo)).layer(DefaultBodyLimit::max(5*1024*1024)).layer(middleware::from_fn_with_state(state.clone(),limit)).with_state(state)
 }
 async fn limit(
     State(s): State<AppState>,
@@ -196,10 +209,15 @@ async fn seller(h: &HeaderMap, s: &AppState) -> R<String> {
     let c = decode::<Claims>(raw, &key, &v)
         .map_err(|_| unauth())?
         .claims;
-    if c.tid != TENANT || c.oid.is_empty() {
+    if c.tid != TENANT || c.oid.is_empty() || !has_api_scope(&c.scp) {
         return Err(unauth());
     }
     Ok(c.oid)
+}
+fn has_api_scope(scopes: &str) -> bool {
+    scopes
+        .split_ascii_whitespace()
+        .any(|scope| scope == API_SCOPE)
 }
 fn unauth() -> (StatusCode, Json<Value>) {
     err(
@@ -308,7 +326,7 @@ async fn paid(h: &HeaderMap, s: &AppState) -> R<bool> {
     else {
         return Ok(false);
     };
-    let u = format!("{VERIFY}{}", urlencoding::encode(v));
+    let u = format!("{}{}", s.verify_base, urlencoding::encode(v));
     let x = s
         .http
         .get(u)
@@ -655,6 +673,13 @@ mod tests {
         .is_none());
     }
 
+    #[test]
+    fn seller_tokens_require_the_product_api_scope() {
+        assert!(has_api_scope("openid access_as_user profile"));
+        assert!(!has_api_scope("openid profile email"));
+        assert!(!has_api_scope("access_as_user_extra"));
+    }
+
     #[tokio::test]
     async fn demo_is_stateless_across_backend_instances() {
         let (_, created) = create_demo().await.unwrap();
@@ -712,6 +737,80 @@ mod tests {
         )
         .await;
         assert!(matches!(result, Err((StatusCode::FORBIDDEN, _))));
+    }
+
+    #[tokio::test]
+    async fn verified_license_raises_catalogue_and_link_limits() {
+        let fixture = Router::new().route(
+            "/verify",
+            get(|| async { Json(json!({"valid":true,"reason":"ok","expires_at":null})) }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let fixture_task = tokio::spawn(async move {
+            axum::serve(listener, fixture).await.unwrap();
+        });
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::migrate!().run(&pool).await.unwrap();
+        let state = AppState::with_verify_base(pool, format!("http://{address}/verify?license="));
+        let mut headers = HeaderMap::new();
+        headers.insert("x-test-seller", HeaderValue::from_static("paid-seller"));
+        headers.insert(
+            "x-sociobot-license",
+            HeaderValue::from_static("recorded-valid-license"),
+        );
+        let products = (0..13)
+            .map(|n| Product {
+                id: n.to_string(),
+                sku: format!("SKU-{n}"),
+                name: format!("Product {n}"),
+                description: String::new(),
+                category: "Products".into(),
+                price_cents: Some(100),
+                stock_note: "Ask".into(),
+            })
+            .collect();
+        let saved = save_catalogue(
+            State(state.clone()),
+            headers.clone(),
+            Json(Save {
+                settings: Settings {
+                    business_name: "Paid Seller".into(),
+                    price_label: "Trade price".into(),
+                    tax_note: String::new(),
+                    currency: "GBP".into(),
+                },
+                products,
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved["count"], 13);
+
+        let _ = create_link(
+            State(state.clone()),
+            headers.clone(),
+            Json(Link {
+                label: "Buyer one".into(),
+            }),
+        )
+        .await
+        .unwrap();
+        let _ = create_link(
+            State(state),
+            headers,
+            Json(Link {
+                label: "Buyer two".into(),
+            }),
+        )
+        .await
+        .unwrap();
+        fixture_task.abort();
     }
 
     #[tokio::test]
