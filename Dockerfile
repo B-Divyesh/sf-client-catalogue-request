@@ -7,9 +7,8 @@ COPY public ./public
 COPY src ./src
 RUN npm ci && npm run build
 
-# Cargo.lock resolves ICU 2.3, whose MSRV is Rust 1.88. Keep this in sync
-# with the documented local build requirement and the Dockerfile regression test.
-FROM rust:1.88-bookworm AS server
+# Track the stable Rust image so the lockfile is built with the current toolchain.
+FROM rust:1-bookworm AS server
 ARG BUILD_SHA=dev
 ENV BUILD_SHA=${BUILD_SHA}
 WORKDIR /build

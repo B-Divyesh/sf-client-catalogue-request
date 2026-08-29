@@ -75,5 +75,54 @@
     "where": "privacy page and README",
     "test": "npm test -- --grep @claim:privacy-runtime",
     "sandbox": "fresh browser context; load the landing page and demo while recording every request origin"
+  },
+  {
+    "id": "demo-local",
+    "claim": "The server does not retain demo requests",
+    "where": "README, privacy page, demo notes",
+    "test": "cargo test demo_is_stateless_across_backend_instances",
+    "sandbox": "create a sample workspace and read it through a separate backend state; the built-in sample is available without retained server state"
+  },
+  {
+    "id": "demo-reset",
+    "claim": "Reset demo removes the sample data from this browser",
+    "where": "privacy page and demo notes",
+    "test": "npm test -- --grep @claim:demo-reset",
+    "sandbox": "fresh browser context; reset a demo and assert its submitted-request storage key is removed"
+  },
+  {
+    "id": "csv-import-cap",
+    "claim": "Paid imports support up to 5,000 rows",
+    "where": "README",
+    "test": "cargo test catalogue_import_cap_is_five_thousand_rows",
+    "sandbox": "fresh in-memory tenant; attempt a 5,001-row import and assert the server rejects it"
+  },
+  {
+    "id": "port-runtime",
+    "claim": "Only PORT is needed in production",
+    "where": "README and runtime contract",
+    "test": "cargo test runtime_defaults_to_port_and_local_paths",
+    "sandbox": "construct runtime configuration without environment values and assert the port and local paths default"
+  },
+  {
+    "id": "client-data-control",
+    "claim": "Sellers can delete a client request from their inbox",
+    "where": "privacy page",
+    "test": "npm test -- --grep @claim:client-data-control",
+    "sandbox": "fresh seller tenant; submit a request through its client link and delete it from the seller inbox"
+  },
+  {
+    "id": "seller-tenancy",
+    "claim": "Each Sociobot seller has a separate workspace",
+    "where": "seller sign-in page",
+    "test": "cargo test sellers_are_isolated",
+    "sandbox": "fresh in-memory database; create two seller subjects and assert one seller cannot read the other's catalogue"
+  },
+  {
+    "id": "paid-license-invalid",
+    "claim": "An inactive license shows a notice and keeps paid limits locked",
+    "where": "license restore form",
+    "test": "npm test -- --grep @claim:paid-license-invalid",
+    "sandbox": "fresh browser context; mock a revoked Sociobot verification response and assert the status notice and visible restore field"
   }
 ]

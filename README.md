@@ -8,11 +8,11 @@ Live product: <https://client-catalogue-request.sociobot.in>
 
 ## Try the sandbox
 
-Open `/demo` or <https://client-catalogue-request.sociobot.in/demo>. It includes six realistic products, POA pricing, stock caveats, a request basket, and a sample seller inbox. The browser stores only a random demo workspace ID. The server keeps demo requests in isolated memory for up to 24 hours. Use **Reset demo** to delete that workspace.
+Open `/demo` or <https://client-catalogue-request.sociobot.in/demo>. It includes six realistic products, POA pricing, stock caveats, a request basket, and a sample seller inbox. The browser stores the isolated sample workspace and sample requests. The server does not retain demo requests. Use **Reset demo** to remove the sample data from this browser.
 
 ## Seller workflow
 
-1. Open `/manage` and claim a new workspace with a business name and password.
+1. Open `/manage` and sign in with Sociobot. Your Sociobot account receives its own workspace.
 2. Download the CSV template. Import a file with `sku` and `name` columns. Price, description, category, and stock note are optional.
 3. Create a named client link and share it with that client.
 4. Review incoming requests in the workspace. Export all lines to CSV or print a request to PDF.
@@ -21,7 +21,7 @@ The free workspace supports 12 catalogue rows and one client link. Request expor
 
 ## Run locally
 
-Requirements: Node.js 22+, npm, Rust 1.88+, and SQLite build support.
+Requirements: Node.js 22+, npm, current stable Rust, and SQLite build support.
 
 ```sh
 npm ci
@@ -61,7 +61,7 @@ A blank price becomes POA. Prices use major currency units in CSV and integer mi
 
 The root `Dockerfile` builds the Vite frontend and Rust server. It runs as a non-root user and persists SQLite under `/app/data`. Mount that path as a volume. `/health` returns the build SHA passed as `BUILD_SHA`.
 
-Seller password hashes, sessions, catalogue rows, client tokens, and quote requests stay in SQLite. Browser storage contains the seller session and any pasted Sociobot license. There are no analytics, advertising scripts, remote fonts, or runtime CDNs.
+Seller tenant data, catalogue rows, client tokens, and quote requests stay in SQLite. Browser storage contains an Entra sign-in token and any pasted Sociobot license. There are no analytics, advertising scripts, remote fonts, or runtime CDNs.
 
 See [privacy](https://client-catalogue-request.sociobot.in/privacy), [terms](https://client-catalogue-request.sociobot.in/terms), [demo notes](.factory/demo.md), and [visual system](.factory/design.md).
 

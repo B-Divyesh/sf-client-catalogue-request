@@ -14,15 +14,18 @@ test('@claim:demo-isolation demo requests stay in the demo namespace',async({pag
   await page.getByRole('button',{name:'Send quote request'}).click();
   await expect(page.getByRole('heading',{name:/Request RQ-DEMO-[A-F0-9]{4} received/})).toBeVisible();
   const keys=await page.evaluate(()=>Object.keys(localStorage));
-  expect(keys).toEqual(['demo:client-catalogue-request:requests']);
+  expect(keys).toEqual(['demo:client-catalogue-request:requests','demo:client-catalogue-request:submitted']);
+  await page.goto('/demo/inbox');
+  await expect(page.getByText('2 sample requests')).toBeVisible();
   expect(outside).toEqual([]);
 });
 
-test('resetting the demo creates a clean sample workspace',async({page})=>{
+test('@claim:demo-reset resetting the demo removes browser sample requests',async({page})=>{
   await page.goto('/demo');
   const first=await page.evaluate(()=>localStorage.getItem('demo:client-catalogue-request:requests'));
   await page.getByRole('button',{name:'Reset demo'}).click();
   await expect.poll(()=>page.evaluate(()=>localStorage.getItem('demo:client-catalogue-request:requests'))).not.toBe(first);
+  await expect.poll(()=>page.evaluate(()=>localStorage.getItem('demo:client-catalogue-request:submitted'))).toBeNull();
   await page.getByRole('link',{name:'Seller sample'}).click();
   await expect(page.getByText('1 sample request')).toBeVisible();
 });
@@ -83,6 +86,24 @@ test('the request basket works from the keyboard',async({page})=>{
   await expect(page.getByRole('dialog')).not.toBeVisible();
 });
 
+test('the first keyboard stop is the skip link',async({page})=>{
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.skip')).toBeFocused();
+});
+
+test('mobile controls meet touch and text-reflow boundaries',async({page},testInfo)=>{
+  test.skip(testInfo.project.name!=='mobile','This regression is specific to the 390 px mobile layout.');
+  await page.goto('/demo');
+  for(const selector of ['.wordmark','.site-header nav a','.chip','footer nav a']){
+    const boxes=await page.locator(selector).evaluateAll(nodes=>nodes.map(node=>{const box=(node as HTMLElement).getBoundingClientRect();return {width:box.width,height:box.height};}));
+    for(const box of boxes.filter(box=>box.width>0&&box.height>0)){expect(box.width,selector).toBeGreaterThanOrEqual(44);expect(box.height,selector).toBeGreaterThanOrEqual(44);}
+  }
+  await page.setViewportSize({width:320,height:844});
+  await page.evaluate(()=>document.documentElement.style.fontSize='200%');
+  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
+
 test('public routes keep the document skeleton and load without console errors',async({page},testInfo)=>{
   test.skip(testInfo.project.name==='mobile','The mobile project covers the interactive catalogue claims.');
   const errors:string[]=[];
@@ -120,6 +141,13 @@ test('@claim:paid-license stores and verifies a returned license',async({page})=
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('sb_license_cache:client-catalogue-request')||'null')?.valid)).toBe(true);
 });
 
+test('@claim:paid-license-invalid shows an accessible inactive-license notice',async({page})=>{
+  await page.route('https://api.sociobot.in/api/v1/products/client-catalogue-request/verify?license=invalid-license',route=>route.fulfill({json:{valid:false,reason:'revoked',expires_at:null}}));
+  await page.goto('/?license=invalid-license');
+  await expect(page.getByRole('status')).toContainText('License no longer active');
+  await expect(page.getByLabel('Have a license? Paste it')).toBeVisible();
+});
+
 test('@claim:privacy-runtime uses no third-party runtime assets',async({page})=>{
   const origins=new Set<string>();
   page.on('request',request=>origins.add(new URL(request.url()).origin));
@@ -128,18 +156,10 @@ test('@claim:privacy-runtime uses no third-party runtime assets',async({page})=>
   expect([...origins]).toEqual(['http://127.0.0.1:4173']);
 });
 
-test('@claim:csv-import seller import to client request works end to end',async({page},testInfo)=>{
+test('@claim:csv-import @claim:client-data-control seller import to client request works end to end',async({page},testInfo)=>{
   test.skip(testInfo.project.name==='mobile','The same responsive UI is covered by mobile claim tests.');
+  await page.addInitScript(()=>localStorage.setItem('ccr:session','test-seller:browser-e2e'));
   await page.goto('/manage');
-  const password='correct horse battery';
-  if(await page.getByRole('heading',{name:'Set up your request desk'}).isVisible()){
-    await page.getByLabel('Business name').fill('Northline Test Supply');
-    await page.getByLabel('Password').fill(password);
-    await page.getByRole('button',{name:'Create seller workspace'}).click();
-  }else{
-    await page.getByLabel('Password').fill(password);
-    await page.getByRole('button',{name:'Open seller workspace'}).click();
-  }
   await expect(page.getByRole('heading',{name:'Prepare links. Receive clean requests.'})).toBeVisible();
   await page.getByLabel('Choose a product CSV').setInputFiles({name:'products.csv',mimeType:'text/csv',buffer:Buffer.from('sku,name,description,category,price,stock_note\nT-1,Test tray,Oak tray,Service,14.50,In stock')});
   await page.getByRole('button',{name:'Save catalogue'}).click();
@@ -159,4 +179,7 @@ test('@claim:csv-import seller import to client request works end to end',async(
   await expect(page.getByRole('heading',{name:/Request RQ-/})).toBeVisible();
   await page.goto('/manage');
   await expect(page.getByText('alex@example.test').first()).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Delete request'}).click();
+  await expect(page.getByText('alex@example.test')).toHaveCount(0);
 });
