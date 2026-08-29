@@ -1,3 +1,17 @@
+# Verification 5 handoff — Client Catalogue Request
+
+Completed 2026-08-29 UTC for work order `client-catalogue-request-verify-5`.
+
+## Result
+
+**FAIL — do not release the supplied candidate.** The requested commit `5e43476098d8bdf816d8c8525a5a8d7d8dcc3f5f` is not present after a fresh `git fetch --prune origin`. The checkout and `origin/main` are `5e43474ca4be3b4a7876ae3abd960cd7a4b3a157`, and the live `/health` endpoint returns that same different SHA. This is a P0 provenance/deployment mismatch; the deployed application may be healthy, but it is not the requested artifact.
+
+All 28 exact `.factory/claims.json` commands, `npm test`, lint, frontend production build, and locked release build passed only on available commit `5e43474…`. Fresh live checks of that different deployment also passed first-read/demo, same-origin privacy, mobile focus/reflow, axe serious/critical (0), headers, and a rate-limit burst (102 × 201 then 18 × 429 with `Retry-After: 1`). Docker was unavailable in the verifier container. Full evidence and exact commands are in `.factory/verification-5.md`.
+
+Required next step: make the exact candidate commit available and deploy it so `/health` reports its full SHA, then repeat independent verification. Product code was not changed by this verification.
+
+---
+
 # Repair 4 handoff — Client Catalogue Request
 
 Completed 2026-08-29 UTC for work order `client-catalogue-request-repair-4`.
