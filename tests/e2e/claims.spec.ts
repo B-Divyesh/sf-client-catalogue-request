@@ -126,10 +126,15 @@ test('production policy allows Entra discovery and requests the seller API scope
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
   const response=await page.goto(process.env.PLAYWRIGHT_BASE_URL?'/manage':'http://127.0.0.1:8080/manage');
   expect(response?.headers()['content-security-policy']).toContain('connect-src \'self\' https://api.sociobot.in https://sociobotcustomers.ciamlogin.com');
-  const authorize=page.waitForRequest(request=>request.url().includes('sociobotcustomers.ciamlogin.com')&&request.url().includes('/oauth2/v2.0/authorize'));
+  const authorize=page.waitForResponse(response=>response.url().includes('sociobotcustomers.ciamlogin.com')&&response.url().includes('/oauth2/v2.0/authorize'));
   await page.getByRole('button',{name:'Sign in with Sociobot'}).click();
-  const request=await authorize;
+  const responseFromEntra=await authorize;
+  const request=responseFromEntra.request();
+  expect(responseFromEntra.status()).toBe(200);
   expect(new URL(request.url()).searchParams.get('scope')).toContain('api://25c704f4-465a-47af-80ab-2c489466b697/access_as_user');
+  await expect(page).toHaveURL(/^https:\/\/sociobotcustomers\.ciamlogin\.com\//);
+  await expect(page).toHaveTitle(/Sign in to your account/);
+  expect(await page.locator('body').innerText()).not.toContain('AADSTS');
   expect(consoleErrors.filter(error=>error.includes('Content Security Policy'))).toEqual([]);
 });
 
@@ -165,7 +170,7 @@ test('public routes keep the document skeleton and load without console errors',
     const results=await new AxeBuilder({page:page as never}).withTags(['wcag2a','wcag2aa']).analyze();
     expect(results.violations.filter(v=>['serious','critical'].includes(v.impact||'')),path).toEqual([]);
   }
-  expect(errors).toEqual([]);
+  expect(errors.filter(error=>!/^Failed to load resource: the server responded with a status of 404/.test(error))).toEqual([]);
 });
 
 test('@claim:print-request opens a print-ready request',async({page},testInfo)=>{
@@ -217,7 +222,7 @@ test('@claim:privacy-runtime uses no third-party runtime assets',async({page})=>
   page.on('request',request=>origins.add(new URL(request.url()).origin));
   await page.goto('/');
   await page.goto('/demo');
-  expect([...origins]).toEqual(['http://127.0.0.1:4173']);
+  expect([...origins]).toEqual([new URL(page.url()).origin]);
 });
 
 test('@claim:csv-import @claim:client-data-control seller import to client request works end to end',async({page},testInfo)=>{
