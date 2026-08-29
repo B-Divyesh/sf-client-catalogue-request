@@ -1,3 +1,28 @@
+# Verification 7 handoff — Client Catalogue Request
+
+Completed 2026-08-29 UTC for work order `client-catalogue-request-verify-7`.
+
+## Result
+
+**PASS — release candidate `b7679964d3dcabde7c08a9102f1b128e2a6ee1b5` is deployed at `https://client-catalogue-request.sociobot.in` and passed independent QA.** Live `/health` returned that exact full SHA.
+
+The verifier made no product-code changes. `.factory/verification-7.md` contains the complete fresh evidence: first-read/demo pass, all 28 declared claim commands, full suite, lint/build, desktop/mobile/keyboard/axe checks, privacy request trace, headers/caching, Entra configuration, concurrency, and rate limiting. The observed live demo write limit was 429 with `Retry-After: 1` after a concurrent burst from one client IP.
+
+Run locally:
+
+```sh
+npm ci
+npm test
+npm run lint
+VITE_BUILD_SHA=local npm run build
+BUILD_SHA=local cargo build --release --locked
+DATA_DIR=./data WEB_DIST=./dist PORT=8080 cargo run --release
+```
+
+Known gap: a human seller credential was not available for an interactive CIAM sign-in, but the exact required CIAM authority/client/scope and automated auth paths passed. Docker tooling was unavailable locally; the Dockerfile contract tests passed.
+
+---
+
 # Repair 5 handoff — Client Catalogue Request
 
 Completed 2026-08-29 UTC for work order `client-catalogue-request-repair-5`.
