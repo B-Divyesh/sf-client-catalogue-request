@@ -3,7 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 
 test('@claim:demo-isolation demo requests stay in the demo namespace',async({page})=>{
   const outside:string[]=[];
-  page.on('request',r=>{if(new URL(r.url()).origin!=='http://127.0.0.1:4173')outside.push(r.url());});
+  const productOrigin=new URL(process.env.PLAYWRIGHT_BASE_URL||'http://127.0.0.1:4173').origin;
+  page.on('request',r=>{if(new URL(r.url()).origin!==productOrigin)outside.push(r.url());});
   await page.goto('/demo');
   await expect(page.getByText('Demo — sample data, nothing is saved')).toBeVisible();
   await page.getByRole('button',{name:'Add to request'}).first().click();
