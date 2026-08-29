@@ -227,14 +227,64 @@ test('mobile controls meet touch and text-reflow boundaries',async({page},testIn
   await page.goto('/demo/inbox');
   const emailLink=await page.getByRole('link',{name:'maya@example.test'}).boundingBox();
   expect(emailLink?.height).toBeGreaterThanOrEqual(44);
+  const inboxGeometry=async()=>page.evaluate(()=>{
+    const card=document.querySelector<HTMLElement>('.request-card')!;
+    const tableWrap=card.querySelector<HTMLElement>('.table-wrap')!;
+    const cardBox=card.getBoundingClientRect();
+    const wrapBox=tableWrap.getBoundingClientRect();
+    return {
+      clientWidth:document.documentElement.clientWidth,
+      scrollWidth:document.documentElement.scrollWidth,
+      cardLeft:cardBox.left,
+      cardRight:cardBox.right,
+      wrapLeft:wrapBox.left,
+      wrapRight:wrapBox.right,
+      tableClientWidth:tableWrap.clientWidth,
+      tableScrollWidth:tableWrap.scrollWidth,
+    };
+  });
+  const expectInboxToReflow=(geometry:Awaited<ReturnType<typeof inboxGeometry>>)=>{
+    expect(geometry.scrollWidth).toBe(geometry.clientWidth);
+    expect(geometry.cardLeft).toBeGreaterThanOrEqual(0);
+    expect(geometry.cardRight).toBeLessThanOrEqual(geometry.clientWidth);
+    expect(geometry.wrapLeft).toBeGreaterThanOrEqual(geometry.cardLeft);
+    expect(geometry.wrapRight).toBeLessThanOrEqual(geometry.cardRight);
+    expect(geometry.tableScrollWidth).toBeGreaterThan(geometry.tableClientWidth);
+  };
+  expectInboxToReflow(await inboxGeometry());
   await page.goto('/demo');
   for(const selector of ['.demo-banner button','.demo-banner a']){
     const boxes=await page.locator(selector).evaluateAll(nodes=>nodes.map(node=>{const box=(node as HTMLElement).getBoundingClientRect();return {width:box.width,height:box.height};}));
     for(const box of boxes){expect(box.width,selector).toBeGreaterThanOrEqual(44);expect(box.height,selector).toBeGreaterThanOrEqual(44);}
   }
   await page.setViewportSize({width:320,height:844});
+  await page.goto('/demo/inbox');
   await page.evaluate(()=>document.documentElement.style.fontSize='200%');
-  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  expectInboxToReflow(await inboxGeometry());
+  for(const locator of [
+    page.getByRole('link',{name:'Start for real'}),
+    page.getByRole('link',{name:'Return to catalogue'}),
+    page.getByRole('button',{name:'Export CSV'}),
+    page.getByRole('link',{name:'maya@example.test'}),
+    page.getByText('Please quote delivery to Bristol.'),
+    page.getByRole('button',{name:'Print request / save PDF'}),
+  ]){
+    await locator.scrollIntoViewIfNeeded();
+    const box=await locator.boundingBox();
+    expect(box?.x).toBeGreaterThanOrEqual(0);
+    expect((box?.x||0)+(box?.width||0)).toBeLessThanOrEqual(320);
+  }
+  const tableWrap=page.locator('.request-card .table-wrap').first();
+  await tableWrap.focus();
+  await expect(tableWrap).toBeFocused();
+  const initialTableScroll=await tableWrap.evaluate(node=>node.scrollLeft);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(()=>tableWrap.evaluate(node=>node.scrollLeft)).toBeGreaterThan(initialTableScroll);
+  await tableWrap.evaluate(node=>{node.scrollLeft=node.scrollWidth;});
+  const wrapBox=await tableWrap.boundingBox();
+  const priceHeaderBox=await page.getByRole('columnheader',{name:'Unit price'}).boundingBox();
+  expect(priceHeaderBox?.x).toBeGreaterThanOrEqual(wrapBox?.x||0);
+  expect((priceHeaderBox?.x||0)+(priceHeaderBox?.width||0)).toBeLessThanOrEqual((wrapBox?.x||0)+(wrapBox?.width||0)+1);
 });
 
 test('public routes keep the document skeleton and load without console errors',async({page})=>{
