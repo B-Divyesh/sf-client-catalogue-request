@@ -1,31 +1,28 @@
-# Verification 8 handoff — Client Catalogue Request
+# Review 3 handoff — Client Catalogue Request
 
-## PASS
+## Result
 
-Candidate `6744f2a7ff39804100fe60f5cf3a24bd13decb4c` is accepted at <https://client-catalogue-request.sociobot.in>.
-
-Live `/health` returned the exact full candidate SHA. The SHA-stamped candidate frontend build produced `index-BUOHNHNV.js`, which matched the deployed JavaScript byte-for-byte.
+PASS. This reviewer changed no product code. `.factory/review-3.md` records the completed adversarial review.
 
 ## What was verified
 
-- All 31 `.factory/claims.json` commands completed successfully, followed by a passing unfiltered `npm test` (12 Vitest, 13 Rust, 54 Playwright desktop/mobile tests).
-- `npm run lint`, candidate-SHA Vite production build, and locked candidate-SHA Rust release build passed.
-- Live first-read, one-click sandbox, normal request, invalid quantity recovery, CSV download, keyboard, 390 px mobile, reduced motion, Axe, console/page-error, privacy-request, headers/cache, Entra authority, billing handoff, rate-limit, persistence, tenancy, and health checks passed.
-- A release binary ran with only `PORT` supplied and created its default SQLite storage.
+- Live cold loads at 390 px and desktop: clear job, audience, and first action before scrolling; no normal-route console/page errors or horizontal overflow.
+- One-click `/?demo=1`: six sample products, POA prices, stock notes, request basket, persistent isolation banner, seller sample, reset, isolated `demo:` storage, and same-origin-only request log.
+- Every exact command in all 31 `.factory/claims.json` entries from fresh clone `/tmp/client-catalogue-review-3.W1NeQ0`: passed.
+- Live metadata, route titles, h1/main, canonical links, shared shell, 404, link crawl, headers, keyboard focus, mobile layout, and Axe WCAG 2 A/AA checks.
+- Earlier review and polish findings were rechecked against live behavior and code; none remain.
 
-## Run / verify
+## Re-run
 
 ```sh
 npm ci
 npm test
 npm run lint
-VITE_BUILD_SHA=6744f2a7ff39804100fe60f5cf3a24bd13decb4c npm run build
-BUILD_SHA=6744f2a7ff39804100fe60f5cf3a24bd13decb4c cargo build --release --locked
-PORT=8080 target/release/client-catalogue-request
+npm run build
 ```
 
-Open `http://localhost:8080/?demo=1` for the isolated sample.
+For the isolated sample, open `https://client-catalogue-request.sociobot.in/?demo=1` in a fresh browser context. The full evidence and copy audit are in `.factory/review-3.md`.
 
 ## Known gaps
 
-No product defect remains. Docker was unavailable in this verifier container, so the local image build was not run; the Dockerfile contract has passing repository coverage and the deployed candidate is live. Full evidence is in `.factory/verification-8.md`.
+No product defect found. The expected browser console failed-resource message for the intentional HTTP 404 was excluded from normal-route console checks.
