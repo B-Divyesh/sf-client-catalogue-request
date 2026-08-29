@@ -1,3 +1,38 @@
+# Verification 6 handoff — Client Catalogue Request
+
+Completed 2026-08-29 UTC for work order `client-catalogue-request-verify-6`.
+
+## Result
+
+**FAIL — do not release candidate `5e43474ca4be3b4a7876ae3abd960cd7a4b3a157`.**
+
+The earlier verification-5 blocker was a mistyped candidate SHA. The exact candidate requested in round 6 exists, live `/health` reports it, and candidate-stamped frontend artifacts match live byte for byte.
+
+Fresh live testing found one high-severity release blocker. A newly submitted request uses a long RFC3339 timestamp. At 320 px with text at 200%, that `<time>` element does not wrap: the document grows from 320 px to 440 px and requires 120 px of horizontal page scrolling. The initial viewport clips the timestamp. The existing regression passes because it checks only the shorter seeded date.
+
+Required repair: make `.request-card time` wrap within the card, and extend the mobile regression to submit a real request before asserting 320 px/200% reflow. Evidence is in `.factory/evidence/verification-6/mobile-320-text200-timestamp-left.png` and `mobile-320-text200-timestamp-right.png`.
+
+Fresh evidence:
+
+- all 28 exact `.factory/claims.json` commands passed;
+- `npm test` passed with 12 Vitest, 13 Rust, and 45 Playwright tests; 5 documented skips;
+- lint, typecheck, exact candidate frontend build, and locked release-server build passed;
+- first-read and one-click demo gates passed;
+- the live demo completed normal, invalid-input, recovery, CSV, print, reset, keyboard, and mobile flows;
+- Axe found 0 serious/critical issues across seven routes at desktop and 390 px;
+- the factory URL verifier passed the landing, direct demo, and sample inbox with zero console/page errors;
+- the seeded inbox remained viewport-wide at 390 px and 320 px/200% text, but a real request timestamp failed that boundary as described above;
+- the full demo flow stayed same-origin, response security/caching headers passed, and no console/page errors occurred;
+- live limits were 40 reads and 12 writes per client per second before 429 with `Retry-After: 1`; Sociobot license verification allowed 30 checks before 429 with `Retry-After: 4`;
+- Lighthouse mobile scored 100 in Performance, Accessibility, Best Practices, and SEO; LCP 1.2 s, TBT 0 ms, CLS 0;
+- an independent backend flow passed catalogue persistence, validation, free limits, request isolation/deletion, link revocation, restart, and 100-request health concurrency.
+
+Defects by severity: **critical none; high one; medium none; low none.**
+
+Full evidence and the credentialed-sign-in test limitation are recorded in `.factory/verification-6.md`. Product code was not modified. Docker was unavailable in this verifier container; Docker contract tests and the exact frontend/server production stages passed independently.
+
+---
+
 # Verification 5 handoff — Client Catalogue Request
 
 Completed 2026-08-29 UTC for work order `client-catalogue-request-verify-5`.
